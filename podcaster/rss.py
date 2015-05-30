@@ -8,7 +8,6 @@ from datetime import datetime
 import feedparser
 
 
-
 def parse_feed(url):
     """Return feed structured via feedparser on success.
     None on failure
@@ -50,7 +49,7 @@ def feed_to_obj(feed):
                             parse_datestr(entry.published))
         episodes.append(episode)
     return Podcast(feed.href,
-                    feed.feed.get('title', ''),
+                    feed.feed.title,
                     feed.feed.get('author', ''),
                     feed.feed.get('link', ''),
                     feed.feed.get('summary', ''),
