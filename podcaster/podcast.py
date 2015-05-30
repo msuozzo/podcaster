@@ -1,6 +1,6 @@
 """Classes facilitating the storage of podcast data
 """
-from pprint import pprint
+from pprint import pformat
 
 
 class Podcast(object):
@@ -40,7 +40,7 @@ class Podcast(object):
     def __repr__(self):
         """A pretty-printed representation of the podcast
         """
-        return pprint(self.to_simple_dict())
+        return pformat(self.to_simple_dict())
 
 
 class Episode(object):

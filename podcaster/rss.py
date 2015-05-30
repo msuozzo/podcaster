@@ -1,7 +1,7 @@
 """Interface with RSS pages
 """
 from http import get_meta_redirect, get_rss_link
-from podcast import Podcast
+from podcast import Podcast, Episode
 
 from datetime import datetime
 
@@ -36,18 +36,26 @@ def parse_feed(url):
 def feed_to_obj(feed):
     """Converts a feedparser feed to a Podcast object
     """
+    #TODO: use pytz to convert to UTC
+    parse_datestr = lambda datestr: datetime.strptime(datestr, "%a, %d %b %Y %H:%M:%S %Z")
     episodes = []
     for entry in feed.entries:
-        #TODO
-        pass
-    #TODO: use pytz to convert to UTC
-    last_updated = datetime.strptime(feed.updated, "%a, %d %b %Y %H:%M:%S %Z")
+        links = [link.href for link in entry.links if link.type.startswith('audio')]
+        if not len(links):
+            continue
+        link = links[0]
+        episode = Episode(link,
+                            entry.get('title', ''),
+                            entry.get('summary', ''),
+                            parse_datestr(entry.published))
+        episodes.append(episode)
     return Podcast(feed.href,
                     feed.feed.get('title', ''),
                     feed.feed.get('author', ''),
                     feed.feed.get('link', ''),
                     feed.feed.get('summary', ''),
-                    last_updated)
+                    parse_datestr(feed.updated),
+                    episodes)
 
 
 if __name__ == "__main__":
