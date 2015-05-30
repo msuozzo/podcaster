@@ -1,28 +1,12 @@
-from podcaster.http import get_meta_redirect, get_rss_link
+"""Interface with RSS pages
+"""
+from http import get_meta_redirect, get_rss_link
+from podcast import Podcast
 
 from datetime import datetime
-import time
 
 import feedparser
 
-
-class Podcast(object):
-    """A podcast feed
-    """
-
-    def __init__(self, url, **kwargs):
-        self.url = url
-        self.title = kwargs.get('title', self.url)
-        self.author = kwargs.get('author', '')
-        self.site_link = kwargs.get('link', '')
-        self.description = kwargs.get('summary', '')
-
-        #FIXME: choose good default for unmarked podcasts
-        iso_updated = kwargs.get('updated_parsed', time.localtime())
-        self.last_updated = datetime(*iso_updated[:7])
-
-    def __str__(self):
-        return '"%s" By %s' % (self.title, self.author)
 
 
 def parse_feed(url):
@@ -49,6 +33,23 @@ def parse_feed(url):
         return parsed_feed
 
 
+def feed_to_obj(feed):
+    """Converts a feedparser feed to a Podcast object
+    """
+    episodes = []
+    for entry in feed.entries:
+        #TODO
+        pass
+    #TODO: use pytz to convert to UTC
+    last_updated = datetime.strptime(feed.updated, "%a, %d %b %Y %H:%M:%S %Z")
+    return Podcast(feed.href,
+                    feed.feed.get('title', ''),
+                    feed.feed.get('author', ''),
+                    feed.feed.get('link', ''),
+                    feed.feed.get('summary', ''),
+                    last_updated)
+
+
 if __name__ == "__main__":
     import pprint
 
@@ -58,4 +59,5 @@ if __name__ == "__main__":
     for k, v in feed.iteritems():
         print k, shorten(v)
     print pprint.pprint(feed.feed)
-    p = Podcast(feed.href, **feed.feed)
+    p = feed_to_obj(feed)
+    print pprint.pprint(feed.entries[0])
