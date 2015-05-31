@@ -59,19 +59,24 @@ class PodcastFileManager(object):
         """
         return {name: data['rss_url'] for name, data in self._manifest.iteritems()}
 
-    def add_podcast(self, name, rss_url):
+    def add_podcast(self, podcast):
         """Add a podcast to the local state
         """
-        self._manifest[name] = {
+        self._manifest[podcast.name] = {
                 'last_checked': datetime.now(),
                 'episode_data': {},
-                'rss_url': rss_url
+                'rss_url': podcast.rss_url
             }
 
     def is_updated(self, podcast):
         """Return whether the Podcast object has been updated since it was last checked
         """
         return self._manifest[podcast.name]['last_checked'] < podcast.last_updated
+
+    def is_downloaded(self, podcast, episode):
+        """Return whether a local copy of the Episode `episode` exists.
+        """
+        return episode.title in self._manifest[podcast.name]['episode_data']
 
     def download_episode(self, podcast, episode):
         """Download an episode to the local machine

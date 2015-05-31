@@ -1,5 +1,5 @@
 from local import PodcastFileManager
-from rss import feed_to_obj, parse_feed
+from rss import get_podcast
 
 from operator import attrgetter, itemgetter
 from datetime import datetime
@@ -9,7 +9,7 @@ class FormatException(BaseException):
     pass
 
 
-def get_menu_header(name, fill='-'):
+def get_menu_header(name, fill='='):
     return [name, len(name) * fill]
 
 
@@ -76,19 +76,10 @@ def symmetric_header_footer(*series):
     ret.append(series_break(bot_break_format, *padded_series))
     return ret
 
-PROMPT = "> "
-
-def get_choice(valid_choices):
-    choice = None
-    while True:
-        choice = raw_input(PROMPT)
-        if choice not in valid_choices:
-            print "Failed. Valid Commands: {%s}" % ", ".join(list(sorted(valid_choices)))
-        else:
-            return choice
 
 class Podcaster(object):
     QUIT = -1
+    PROMPT = "> "
     def __init__(self):
         self.manager = PodcastFileManager()
         self.podcasts = []
@@ -96,8 +87,18 @@ class Podcaster(object):
     def run(self):
         current_menu = self.all_podcasts
         while current_menu != Podcaster.QUIT:
+            print
             current_menu = current_menu()
         self.manager.close()
+
+    def _get_choice(self, valid_choices):
+        choice = None
+        while True:
+            choice = raw_input(Podcaster.PROMPT)
+            if choice not in valid_choices:
+                print "Failed. Valid Commands: {%s}" % ", ".join(list(sorted(valid_choices)))
+            else:
+                return choice
 
     def all_podcasts(self):
         lines = get_menu_header('All Podcasts')
@@ -111,7 +112,7 @@ class Podcaster(object):
 
         actions = {}
         for i, podcast in enumerate(self.podcasts):
-            actions[str(i + 1)] = lambda p=podcast: self.one_podcast(p.name)
+            actions[str(i + 1)] = lambda p=podcast: self.episodes(p)
 
         more_actions = {
                 ('a', 'Add a new podcast URL'): self.add_podcast,
@@ -132,28 +133,78 @@ class Podcaster(object):
 
         print "\n".join(lines)
 
-        choice = get_choice(actions.keys())
+        choice = self._get_choice(actions.keys())
         return actions[choice]
 
-    def one_podcast(self, name):
-        #TODO
-        return Podcaster.QUIT
-
     def add_podcast(self):
-        #TODO
-        return Podcaster.QUIT
+        url = raw_input('Enter URL (empty to cancel): ')
+        if url:
+            print 'Retrieving feed information'
+            #TODO: Error Handling
+            new_podcast = get_podcast(url)
+            add_check = raw_input('Add "%s" (y/N)? ' % new_podcast.name)
+            if add_check == 'y':
+                self.manager.add_podcast(new_podcast)
+                self.podcasts.append(new_podcast)
+                print 'Successfully added "%s"' % new_podcast.name
+            else:
+                print 'Not adding "%s"' % new_podcast.name
+        return self.all_podcasts
+
+    def episodes(self, podcast, base=0):
+        lines = get_menu_header(podcast.name)
+        episodes = list(reversed(sorted(podcast.episodes.values(), key=lambda p: p.date_published)))[base:base + 10]
+        commands = get_command_series(len(episodes))
+        dates = get_series(episodes, "Date",
+                            attrgetter('date_published'),
+                            lambda field: field.strftime('%m/%d'))
+        dld = get_series(episodes, "DLD?",
+                            lambda f: f,
+                            lambda field: "[%s]" % ("X" if self.manager.is_downloaded(podcast, field) else " "))
+        names = get_series(episodes, "Episode",
+                            attrgetter('title'))
+        lines.extend(symmetric_header_footer(commands, dates, dld, names))
+
+        actions = {}
+        for i, episode in enumerate(episodes):
+            actions[str(i + 1)] = lambda e=episode: self.play(e)
+
+        more_actions = {
+                ('b', 'Back to All Podcasts'): self.all_podcasts
+            }
+        if base + 10 <= len(podcast.episodes):
+            more_actions[('n', 'Next Page')] = lambda: self.episodes(podcast, base + 10),
+        if base > 0:
+            more_actions[('p', 'Previous Page')] = lambda: self.episodes(podcast, base - 10),
+        more_commands = get_series(sorted(more_actions.keys()), 'CMD',
+                                    itemgetter(0))
+        description = get_series(sorted(more_actions.keys()), 'Action',
+                                    itemgetter(1))
+        #FIXME: Previous lines may be shorter and will not be padded to this increased size
+        padded_desc = pad_series(description, True, width=len(lines[0]))
+        more_lines = symmetric_header_footer(more_commands, padded_desc)
+        without_headers = more_lines[2:]
+        lines.extend(without_headers)
+
+        for (cmd, _), action in more_actions.iteritems():
+            actions[cmd] = action
+
+        print "\n".join(lines)
+
+        choice = self._get_choice(actions.keys())
+        return actions[choice]
 
     def downloaded_podcasts(self):
         #TODO
         return Podcaster.QUIT
 
-    def play(self):
+    def play(self, episode):
         #TODO
         return Podcaster.QUIT
 
     def update(self):
         print "Updating feeds..."
-        self.podcasts = [feed_to_obj(parse_feed(link)) for link in self.manager.links().iteritems()]
+        self.podcasts = [get_podcast(link) for link in self.manager.links().iteritems()]
         print "All data retrieved"
 
 
