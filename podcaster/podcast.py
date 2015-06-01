@@ -46,9 +46,10 @@ class Podcast(object):
 class Episode(object):
     """A podcast episode
     """
-    def __init__(self, url, title, description='', date_published=None):
+    def __init__(self, url, title, podcast_name, description='', date_published=None):
         self.url = url
         self.title = title
+        self.podcast_name = podcast_name
         self.description = description
         self.date_published = date_published
 

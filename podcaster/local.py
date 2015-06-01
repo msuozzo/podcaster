@@ -73,18 +73,24 @@ class PodcastFileManager(object):
         """
         return self._manifest[podcast.name]['last_checked'] < podcast.last_updated
 
-    def is_downloaded(self, podcast, episode):
+    def is_downloaded(self, episode):
         """Return whether a local copy of the Episode `episode` exists.
         """
-        return episode.title in self._manifest[podcast.name]['episode_data']
+        return episode.title in self._manifest[episode.podcast_name]['episode_data']
 
-    def download_episode(self, podcast, episode):
+    def get_local_uri(self, episode):
+        if self.is_downloaded(episode):
+            return self._manifest[episode.podcast_name]['episode_data'][episode.title]['uri']
+        else:
+            return None
+
+    def download_episode(self, episode):
         """Download an episode to the local machine
 
         On success: the local path to the episode
         On failure: None
         """
-        local_episodes = self._manifest[podcast.name]['episode_data']
+        local_episodes = self._manifest[episode.podcast_name]['episode_data']
         episode_dict = {'last_position': None}
         remote_fname = episode.url.rsplit('/', 1)[-1]
         local_path = os.path.join(self.storage_dir, remote_fname)
@@ -92,21 +98,21 @@ class PodcastFileManager(object):
         local_episodes[episode.title] = episode_dict
         return download_to_file(episode.url, local_path)
 
-    def play_episode(self, podcast, episode, curr_seconds):
+    def play_episode(self, episode, curr_seconds):
         """Record the position (in seconds) of an episode being played
         """
-        episode_dict = self._manifest[podcast.name]['episode_data'][episode.title]
+        episode_dict = self._manifest[episode.podcast_name]['episode_data'][episode.title]
         episode_dict['last_position'] = curr_seconds
 
-    def finish_episode(self, podcast, episode):
+    def finish_episode(self, episode):
         """Record that an episode is complete by resetting the `last_position` data
         """
-        episode_dict = self._manifest[podcast.name]['episode_data'][episode.title]
+        episode_dict = self._manifest[episode.podcast_name]['episode_data'][episode.title]
         episode_dict['last_position'] = None
 
-    def delete_episode(self, podcast, episode):
+    def delete_episode(self, episode):
         """Delete local file and references to an episode
         """
-        local_episodes = self._manifest[podcast.name]['episode_data']
+        local_episodes = self._manifest[episode.podcast_name]['episode_data']
         os.remove(local_episodes[episode.title]['uri'])
         del local_episodes[episode.title]

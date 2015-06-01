@@ -44,6 +44,7 @@ def _feed_to_obj(feed):
         link = links[0]
         episode = Episode(link,
                             entry.get('title', ''),
+                            feed.feed.title,
                             entry.get('summary', ''),
                             parse_datestr(entry.published))
         episodes.append(episode)

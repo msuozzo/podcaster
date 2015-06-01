@@ -1,8 +1,11 @@
 from local import PodcastFileManager
 from rss import get_podcast
+from player import Player
 
 from operator import attrgetter, itemgetter
 from datetime import datetime
+
+from vlc import MediaPlayer
 
 
 class FormatException(BaseException):
@@ -85,6 +88,7 @@ class Podcaster(object):
         self.podcasts = []
 
     def run(self):
+        self.update()
         current_menu = self.all_podcasts
         while current_menu != Podcaster.QUIT:
             print
@@ -118,15 +122,9 @@ class Podcaster(object):
                 ('a', 'Add a new podcast URL'): self.add_podcast,
                 ('t', 'View Downloaded Episodes'): self.downloaded_podcasts
             }
-        more_commands = get_series(sorted(more_actions.keys()), 'CMD',
-                                    itemgetter(0))
-        description = get_series(sorted(more_actions.keys()), 'Action',
-                                    itemgetter(1))
-        #FIXME: Previous lines may be shorter and will not be padded to this increased size
-        padded_desc = pad_series(description, True, width=len(lines[0]))
-        more_lines = symmetric_header_footer(more_commands, padded_desc)
-        without_headers = more_lines[2:]
-        lines.extend(without_headers)
+
+        #FIXME: remove hard-codeyness
+        lines.extend(self._format_more_actions(more_actions, len(lines[2]) - 6))
 
         for (cmd, _), action in more_actions.iteritems():
             actions[cmd] = action
@@ -151,6 +149,17 @@ class Podcaster(object):
                 print 'Not adding "%s"' % new_podcast.name
         return self.all_podcasts
 
+    def _format_more_actions(self, more_actions, width):
+        more_commands = get_series(sorted(more_actions.keys()), 'CMD',
+                                    itemgetter(0))
+        description = get_series(sorted(more_actions.keys()), 'Action',
+                                    itemgetter(1))
+        #FIXME: Previous lines may be shorter and will not be padded to this increased size
+        padded_desc = pad_series(description, True, width=width)
+        more_lines = symmetric_header_footer(more_commands, padded_desc)
+        without_headers = more_lines[2:]
+        return without_headers
+
     def episodes(self, podcast, base=0):
         lines = get_menu_header(podcast.name)
         episodes = list(reversed(sorted(podcast.episodes.values(), key=lambda p: p.date_published)))[base:base + 10]
@@ -160,7 +169,7 @@ class Podcaster(object):
                             lambda field: field.strftime('%m/%d'))
         dld = get_series(episodes, "DLD?",
                             lambda f: f,
-                            lambda field: "[%s]" % ("X" if self.manager.is_downloaded(podcast, field) else " "))
+                            lambda field: "[%s]" % ("X" if self.manager.is_downloaded(field) else " "))
         names = get_series(episodes, "Episode",
                             attrgetter('title'))
         lines.extend(symmetric_header_footer(commands, dates, dld, names))
@@ -176,15 +185,8 @@ class Podcaster(object):
             more_actions[('n', 'Next Page')] = lambda: self.episodes(podcast, base + 10),
         if base > 0:
             more_actions[('p', 'Previous Page')] = lambda: self.episodes(podcast, base - 10),
-        more_commands = get_series(sorted(more_actions.keys()), 'CMD',
-                                    itemgetter(0))
-        description = get_series(sorted(more_actions.keys()), 'Action',
-                                    itemgetter(1))
-        #FIXME: Previous lines may be shorter and will not be padded to this increased size
-        padded_desc = pad_series(description, True, width=len(lines[0]))
-        more_lines = symmetric_header_footer(more_commands, padded_desc)
-        without_headers = more_lines[2:]
-        lines.extend(without_headers)
+        #FIXME: remove hard-codeyness
+        lines.extend(self._format_more_actions(more_actions, len(lines[2]) - 6))
 
         for (cmd, _), action in more_actions.iteritems():
             actions[cmd] = action
@@ -199,12 +201,18 @@ class Podcaster(object):
         return Podcaster.QUIT
 
     def play(self, episode):
-        #TODO
+        if not self.manager.is_downloaded(episode):
+            #TODO: Error checking
+            self.manager.download_episode(episode)
+        uri = self.manager.get_local_uri(episode)
+        player = Player(uri, lambda: 1)
+        player.run()
+
         return Podcaster.QUIT
 
     def update(self):
         print "Updating feeds..."
-        self.podcasts = [get_podcast(link) for link in self.manager.links().iteritems()]
+        self.podcasts = [get_podcast(link) for name, link in self.manager.links().iteritems()]
         print "All data retrieved"
 
 
