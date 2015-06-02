@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime
 
 from dateutil import parser
+from dateutil.tz import tzutc
 
 
 #TODO: Refactor the os operations to another class
@@ -63,7 +64,7 @@ class PodcastFileManager(object):
         """Add a podcast to the local state
         """
         self._manifest[podcast.name] = {
-                'last_checked': datetime.now(),
+                'last_checked': parser.parse('1/1/1970 00:01:00+0000'),
                 'episode_data': {},
                 'rss_url': podcast.rss_url
             }
@@ -72,6 +73,11 @@ class PodcastFileManager(object):
         """Return whether the Podcast object has been updated since it was last checked
         """
         return self._manifest[podcast.name]['last_checked'] < podcast.last_updated
+
+    def check(self, podcast):
+        """Register the Podcast object as having been checked.
+        """
+        self._manifest[podcast.name]['last_checked'] = datetime.now(tzutc())
 
     def is_downloaded(self, episode):
         """Return whether a local copy of the Episode `episode` exists.

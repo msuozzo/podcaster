@@ -16,8 +16,6 @@ class Player(object):
         self._interrupted = False
         self._finished = False
         self.update_callback = update_callback
-        def set_rate_func(new_rate):
-            return lambda: self.set_playback_rate(new_rate)
         self.commands = {
                 "ff": ("advance 30 seconds", lambda: self.set_position(self.get_position() + 30)),
                 "f": ("advance 10 seconds", lambda: self.set_position(self.get_position() + 10)),
@@ -29,7 +27,8 @@ class Player(object):
                 "b": ("rewind 10 seconds", lambda: self.set_position(self.get_position() - 10)),
                 "bb": ("rewind 30 seconds", lambda: self.set_position(self.get_position() - 30)),
                 "ir": ("increase the rate of playback by 10%", lambda: self.set_playback_rate(self.get_playback_rate() + .1)),
-                "dr": ("decrease the rate of playback by 10%", lambda: self.set_playback_rate(self.get_playback_rate() - .1))
+                "dr": ("decrease the rate of playback by 10%", lambda: self.set_playback_rate(self.get_playback_rate() - .1)),
+                "q": ("exit playback", self.quit)
             }
 
     def _get_command(self):
@@ -49,6 +48,7 @@ class Player(object):
         self.play()
         if start_position:
             self.set_position(start_position)
+        self._finished = False
         while not self._finished:
             self._interrupted = False
             while not self._attempt_command():
@@ -70,6 +70,10 @@ class Player(object):
                 self._print_help()
             return True
         finally:
+            # This is tricky: regardless of user command, if playback finishes, end the player
+            if self._player.get_position() == 1.:
+                self._finished = True
+                return True
             self.update_callback()
 
     def play(self):
@@ -110,3 +114,6 @@ class Player(object):
         command_help = ("\t{}\t{}".format(cmd, help_)
                             for cmd, (help_, _) in sorted(self.commands.items()))
         print "\n".join(chain(help_header, command_help))
+
+    def quit(self):
+        self._finished = True

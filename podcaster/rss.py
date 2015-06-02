@@ -6,6 +6,7 @@ from podcast import Podcast, Episode
 from datetime import datetime
 
 import feedparser
+from dateutil import parser
 
 
 def _parse_feed(url):
@@ -34,8 +35,6 @@ def _parse_feed(url):
 def _feed_to_obj(feed):
     """Converts a feedparser feed to a Podcast object
     """
-    #TODO: use pytz to convert to UTC
-    parse_datestr = lambda datestr: datetime.strptime(datestr, "%a, %d %b %Y %H:%M:%S %Z")
     episodes = []
     for entry in feed.entries:
         links = [link.href for link in entry.links if link.type.startswith('audio')]
@@ -46,14 +45,14 @@ def _feed_to_obj(feed):
                             entry.get('title', ''),
                             feed.feed.title,
                             entry.get('summary', ''),
-                            parse_datestr(entry.published))
+                            parser.parse(entry.published))
         episodes.append(episode)
     return Podcast(feed.href,
                     feed.feed.title,
                     feed.feed.get('author', ''),
                     feed.feed.get('link', ''),
                     feed.feed.get('summary', ''),
-                    parse_datestr(feed.updated),
+                    parser.parse(feed.updated),
                     episodes)
 
 

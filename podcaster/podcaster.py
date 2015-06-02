@@ -21,8 +21,8 @@ def get_series(objs, name, getter, formatter=lambda f: f):
     return header_row + [formatter(getter(obj)) for obj in objs]
 
 
-def get_command_series(num_objs):
-    return ["CMD"] + map(str, range(1, num_objs + 1))
+def get_command_series(num_objs, start=1):
+    return ["CMD"] + map(str, range(start, start + num_objs))
 
 
 def pad_series(series, has_header, width=None, pad_char=' '):
@@ -120,7 +120,8 @@ class Podcaster(object):
 
         more_actions = {
                 ('a', 'Add a new podcast URL'): self.add_podcast,
-                ('t', 'View Downloaded Episodes'): self.downloaded_podcasts
+                ('t', 'View Downloaded Episodes'): self.downloaded_podcasts,
+                ('q', 'Quit'): Podcaster.QUIT
             }
 
         #FIXME: remove hard-codeyness
@@ -161,9 +162,10 @@ class Podcaster(object):
         return without_headers
 
     def episodes(self, podcast, base=0):
+        self.manager.check(podcast)
         lines = get_menu_header(podcast.name)
         episodes = list(reversed(sorted(podcast.episodes.values(), key=lambda p: p.date_published)))[base:base + 10]
-        commands = get_command_series(len(episodes))
+        commands = get_command_series(len(episodes), base + 1)
         dates = get_series(episodes, "Date",
                             attrgetter('date_published'),
                             lambda field: field.strftime('%m/%d'))
@@ -179,12 +181,13 @@ class Podcaster(object):
             actions[str(i + 1)] = lambda e=episode: self.play(e)
 
         more_actions = {
-                ('b', 'Back to All Podcasts'): self.all_podcasts
+                ('b', 'Back to All Podcasts'): self.all_podcasts,
+                ('q', 'Quit'): Podcaster.QUIT
             }
         if base + 10 <= len(podcast.episodes):
-            more_actions[('n', 'Next Page')] = lambda: self.episodes(podcast, base + 10),
+            more_actions[('n', 'Next Page')] = lambda: self.episodes(podcast, base + 10)
         if base > 0:
-            more_actions[('p', 'Previous Page')] = lambda: self.episodes(podcast, base - 10),
+            more_actions[('p', 'Previous Page')] = lambda: self.episodes(podcast, base - 10)
         #FIXME: remove hard-codeyness
         lines.extend(self._format_more_actions(more_actions, len(lines[2]) - 6))
 
@@ -207,6 +210,7 @@ class Podcaster(object):
         uri = self.manager.get_local_uri(episode)
         player = Player(uri, lambda: 1)
         player.run()
+        #TODO: Return to last menu
 
         return Podcaster.QUIT
 
