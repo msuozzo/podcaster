@@ -1,11 +1,9 @@
 from local import PodcastFileManager
 from rss import get_podcast
-from player import Player
+from player import VLCPlayer, CmdLineController
 
 from operator import attrgetter, itemgetter
 from datetime import datetime
-
-from vlc import MediaPlayer
 
 
 class FormatException(BaseException):
@@ -208,8 +206,10 @@ class Podcaster(object):
             #TODO: Error checking
             self.manager.download_episode(episode)
         uri = self.manager.get_local_uri(episode)
-        player = Player(uri, lambda: 1)
-        player.run()
+        player = VLCPlayer(uri)
+        #player.set_position()
+        controller = CmdLineController(player)
+        controller.run()
         #TODO: Return to last menu
 
         return Podcaster.QUIT
