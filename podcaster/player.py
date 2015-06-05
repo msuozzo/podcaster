@@ -1,6 +1,6 @@
 import signal
 
-from vlc import MediaPlayer
+from vlc import MediaPlayer, get_default_instance, PyFile_AsFile
 
 from itertools import chain
 
@@ -42,17 +42,20 @@ class Player(object):
         """Run the command loop
         start_position - the second offset from the start of the file from which to start playback
         """
-        # register interrupt handler
-        interrupt = lambda signum, frame: 1
-        signal.signal(signal.SIGALRM, interrupt)
-        self.play()
-        if start_position:
-            self.set_position(start_position)
-        self._finished = False
-        while not self._finished:
-            self._interrupted = False
-            while not self._attempt_command():
-                self._interrupted = True
+        with open('/dev/null', 'w') as sink:
+            get_default_instance().log_set_file(PyFile_AsFile(sink))
+
+            # register interrupt handler
+            interrupt = lambda signum, frame: 1
+            signal.signal(signal.SIGALRM, interrupt)
+            self.play()
+            if start_position:
+                self.set_position(start_position)
+            self._finished = False
+            while not self._finished:
+                self._interrupted = False
+                while not self._attempt_command():
+                    self._interrupted = True
 
     def _attempt_command(self):
         signal.alarm(Player.TIMEOUT)
