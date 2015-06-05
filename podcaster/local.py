@@ -86,7 +86,7 @@ class PodcastFileManager(object):
 
     def get_local_uri(self, episode):
         if self.is_downloaded(episode):
-            return self._manifest[episode.podcast_name]['episode_data'][episode.title]['uri']
+            return self._get_episode_dict(episode)['uri']
         else:
             return None
 
@@ -104,17 +104,21 @@ class PodcastFileManager(object):
         local_episodes[episode.title] = episode_dict
         return download_to_file(episode.url, local_path)
 
+    def _get_episode_dict(self, episode):
+        return self._manifest[episode.podcast_name]['episode_data'][episode.title]
+
     def play_episode(self, episode, curr_seconds):
         """Record the position (in seconds) of an episode being played
         """
-        episode_dict = self._manifest[episode.podcast_name]['episode_data'][episode.title]
-        episode_dict['last_position'] = curr_seconds
+        self._get_episode_dict(episode)['last_position'] = curr_seconds
+
+    def get_last_position(self, episode):
+        return self._get_episode_dict(episode)['last_position']
 
     def finish_episode(self, episode):
         """Record that an episode is complete by resetting the `last_position` data
         """
-        episode_dict = self._manifest[episode.podcast_name]['episode_data'][episode.title]
-        episode_dict['last_position'] = None
+        self.play_episode(episode, None)
 
     def delete_episode(self, episode):
         """Delete local file and references to an episode

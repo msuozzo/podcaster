@@ -1,6 +1,7 @@
 from local import PodcastFileManager
 from rss import get_podcast
-from player import VLCPlayer, CmdLineController
+from player import VLCPlayer
+from controller import CmdLineController
 
 from operator import attrgetter, itemgetter
 from datetime import datetime
@@ -207,8 +208,10 @@ class Podcaster(object):
             self.manager.download_episode(episode)
         uri = self.manager.get_local_uri(episode)
         player = VLCPlayer(uri)
-        #player.set_position()
-        controller = CmdLineController(player)
+        player.set_position(self.manager.get_last_position(episode))
+        def update_callback(player):
+            self.manager.play_episode(episode, player.get_position())
+        controller = CmdLineController(player, update_callback)
         controller.run()
         #TODO: Return to last menu
 
