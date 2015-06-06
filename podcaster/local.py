@@ -1,8 +1,8 @@
 from http import download_to_file
+from datetime_json import DatetimeEncoder, DatetimeDecoder
 
 import os
 import json
-from copy import deepcopy
 from datetime import datetime
 
 from dateutil import parser
@@ -33,11 +33,8 @@ class PodcastFileManager(object):
     def _dump_manifest(self):
         """Dump the current contents of the manifest dictionary to disk
         """
-        manifest_copy = deepcopy(self._manifest)
-        for _, podcast in manifest_copy.iteritems():
-            podcast['last_checked'] = podcast['last_checked'].isoformat()
         with open(self._manifest_path, 'w') as manifest_file:
-            json.dump(manifest_copy, manifest_file, sort_keys=True, indent=4)
+            json.dump(self._manifest, manifest_file, cls=DatetimeEncoder, sort_keys=True, indent=4)
 
     def _init_manifest(self):
         """Initialize the manifest by reading the manifest file or creating one if none is found
@@ -46,9 +43,7 @@ class PodcastFileManager(object):
             self._manifest = {}
             self._dump_manifest()
         with open(self._manifest_path) as manifest_file:
-            self._manifest = json.load(manifest_file)
-        for _, podcast in self._manifest.iteritems():
-            podcast['last_checked'] = parser.parse(podcast['last_checked'])
+            self._manifest = json.load(manifest_file, cls=DatetimeDecoder)
 
     def close(self):
         """Ensure all state is written to disk (i.e. recoverable when loaded again)
