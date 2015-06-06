@@ -203,23 +203,26 @@ class Podcaster(object):
         return Podcaster.QUIT
 
     def play(self, episode):
+        """Launch the Player to play `episode`
+        """
         if not self.manager.is_downloaded(episode):
             #TODO: Error checking
             self.manager.download_episode(episode)
         uri = self.manager.get_local_uri(episode)
         player = VLCPlayer(uri)
-        player.set_position(self.manager.get_last_position(episode))
-        def update_callback(player):
+        def cb_update_position(player):
+            """Update the playback position periodically.
+            """
             self.manager.play_episode(episode, player.get_position())
-        controller = CmdLineController(player, update_callback)
-        controller.run()
+        controller = CmdLineController(player, cb_update_position)
+        controller.run(initial_position=self.manager.get_last_position(episode))
         #TODO: Return to last menu
 
         return Podcaster.QUIT
 
     def update(self):
         print "Updating feeds..."
-        self.podcasts = [get_podcast(link) for name, link in self.manager.links().iteritems()]
+        self.podcasts = [get_podcast(link) for _, link in self.manager.links().iteritems()]
         print "All data retrieved"
 
 

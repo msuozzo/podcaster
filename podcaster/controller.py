@@ -1,8 +1,12 @@
+"""Controllers for `Player` objects
+"""
 import signal
 from itertools import chain
 
 
 class TimeoutError(BaseException):
+    """Indicates a timeout
+    """
     pass
 
 
@@ -13,16 +17,25 @@ class TimeoutInput(object):
         self.timeout = timeout
         self.prompt = prompt
         # register interrupt handler
-        def interrupt(signum, frame):
-            raise TimeoutError()
-        signal.signal(signal.SIGALRM, interrupt)
+        def cb_interrupt(signum, frame):
+            """Raise a TimeoutError if SIGALRM is encountered
+            """
+            if signum == signal.SIGALRM:
+                raise TimeoutError()
+        signal.signal(signal.SIGALRM, cb_interrupt)
 
-    def get_input(self, prompt=True):
-        """Return the user's input. If the operation timed out, return None.
+    def get_input(self, print_prompt=True):
+        """Prompt the user for input.
+        If the user responds within `self.timeout` seconds, return the user's input.
+        Else, return None.
+
+        print_prompt - print the prompt string (`self.prompt`).
+                        If operation timed out previously, prompt should be
+                        False so the prompt string will not be printed twice.
         """
         signal.alarm(self.timeout)
         try:
-            input_ = raw_input(self.prompt if prompt else '')
+            input_ = raw_input(self.prompt if print_prompt else '')
         except TimeoutError:
             return None
         else:
@@ -57,12 +70,14 @@ class CmdLineController(object):
         self._finished = False
         self._input_getter = TimeoutInput()
 
-    def run(self):
+    def run(self, initial_position=None):
         """Run the command loop
         """
         self._player.play()
+        if initial_position is not None:
+            self._player.set_position(initial_position)
         while True:
-            cmd = self._input_getter.get_input(prompt=self._interrupted)
+            cmd = self._input_getter.get_input(print_prompt=not self._interrupted)
             self._update_callback(self._player)
             # If playback finishes, end the player regardless of the user command
             if self._player.is_finished() or cmd == 'q':
@@ -70,7 +85,7 @@ class CmdLineController(object):
             self._interrupted = cmd is None
             if cmd in self.commands:
                 self.commands[cmd][1]()
-            else:
+            elif not self._interrupted:
                 print 'Invalid Command'
                 self._print_help()
 
