@@ -1,5 +1,6 @@
-from http import download_to_file
+from http import get_response
 from datetime_json import DatetimeEncoder, DatetimeDecoder
+from store import SimpleFileStore
 
 import os
 import json
@@ -11,44 +12,32 @@ from dateutil.tz import tzutc
 
 #TODO: Refactor the os operations to another class
 #TODO: Refactor everything. This is a monstrosity.
-class PodcastFileManager(object):
+class PodcastManager(object):
     """Manages the local files and metadata for the podcasts
     """
-    def __init__(self, storage_dir='.podcasts', manifest_fname='.manifest.json'):
-        self.storage_dir = os.path.abspath(storage_dir)
-        self.manifest_fname = manifest_fname
-        self._manifest_path = os.path.join(self.storage_dir, self.manifest_fname)
+    _MANIFEST_FNAME = '.podcaster.dat'
+
+    def __init__(self, storage_dir='.podcasts'):
+        self._store = SimpleFileStore(storage_dir)
+        self._manifest_fname = PodcastFileManager._MANIFEST_FNAME
         self._manifest = {}
-        self._init_storage()
         self._init_manifest()
-        #TODO: Verify episode paths
-
-    def _init_storage(self):
-        """Initialize the storage directory
-        """
-        #TODO: Handle invalid path (i.e. a file)
-        if not os.path.isdir(self.storage_dir):
-            os.makedirs(self.storage_dir)
-
-    def _dump_manifest(self):
-        """Dump the current contents of the manifest dictionary to disk
-        """
-        with open(self._manifest_path, 'w') as manifest_file:
-            json.dump(self._manifest, manifest_file, cls=DatetimeEncoder, sort_keys=True, indent=4)
 
     def _init_manifest(self):
         """Initialize the manifest by reading the manifest file or creating one if none is found
         """
-        if not os.path.exists(self._manifest_path):
+        if not os.path.exists(self._manifest_fname):
             self._manifest = {}
-            self._dump_manifest()
-        with open(self._manifest_path) as manifest_file:
+            self.save()
+        with open(self._manifest_fname) as manifest_file:
             self._manifest = json.load(manifest_file, cls=DatetimeDecoder)
 
-    def close(self):
+    def save(self):
         """Ensure all state is written to disk (i.e. recoverable when loaded again)
         """
-        self._dump_manifest()
+        self._store.save()
+        with open(self._manifest_fname, 'w') as manifest_file:
+            json.dump(self._manifest, manifest_file, cls=DatetimeEncoder, sort_keys=True, indent=4)
 
     def links(self):
         """Return each podcasts' rss link
@@ -64,26 +53,36 @@ class PodcastFileManager(object):
                 'rss_url': podcast.rss_url
             }
 
-    def is_updated(self, podcast):
+    def has_update(self, podcast):
         """Return whether the Podcast object has been updated since it was last checked
         """
         return self._manifest[podcast.name]['last_checked'] < podcast.last_updated
 
-    def check(self, podcast):
+    def register_checked(self, podcast):
         """Register the Podcast object as having been checked.
         """
         self._manifest[podcast.name]['last_checked'] = datetime.now(tzutc())
 
+    @staticmethod
+    def _to_store_key(episode):
+        """Derives a storage key from an Episode instance
+        """
+        return ' - '.join((episode.podcast_name, episode.title))
+
     def is_downloaded(self, episode):
         """Return whether a local copy of the Episode `episode` exists.
         """
-        return episode.title in self._manifest[episode.podcast_name]['episode_data']
+        key = PodcastFileManager._to_store_key(episode)
+        return self._store.exists(key)
 
     def get_local_uri(self, episode):
-        if self.is_downloaded(episode):
-            return self._get_episode_dict(episode)['uri']
-        else:
-            return None
+        """If a local copy of `episode` exists, return the URI.
+        Else, return None.
+        """
+        key = PodcastFileManager._to_store_key(episode)
+        if self._store.exists(key):
+            return 'file://' + self._store.get_path(key)
+        return None
 
     def download_episode(self, episode):
         """Download an episode to the local machine
@@ -93,31 +92,39 @@ class PodcastFileManager(object):
         """
         local_episodes = self._manifest[episode.podcast_name]['episode_data']
         episode_dict = {'last_position': None}
-        remote_fname = episode.url.rsplit('/', 1)[-1]
-        local_path = os.path.join(self.storage_dir, remote_fname)
-        episode_dict['uri'] = 'file://' + local_path
         local_episodes[episode.title] = episode_dict
-        return download_to_file(episode.url, local_path)
+
+        key = PodcastFileManager._to_store_key(episode)
+        response = get_response(episode.url)
+        if response is None:
+            return None
+        file_data = response.read()
+        self._store.put(key, file_data)
+        return self.get_local_uri(episode)
 
     def _get_episode_dict(self, episode):
         return self._manifest[episode.podcast_name]['episode_data'][episode.title]
 
-    def play_episode(self, episode, curr_seconds):
+    def set_episode_position(self, episode, curr_seconds):
         """Record the position (in seconds) of an episode being played
         """
         self._get_episode_dict(episode)['last_position'] = curr_seconds
 
     def get_last_position(self, episode):
+        """If the podcast was stopped during playback, return the second offset
+            at which it was stopped.
+        Else, return None.
+        """
         return self._get_episode_dict(episode)['last_position']
 
     def finish_episode(self, episode):
         """Record that an episode is complete by resetting the `last_position` data
         """
-        self.play_episode(episode, None)
+        self.set_episode_position(episode, None)
 
     def delete_episode(self, episode):
         """Delete local file and references to an episode
         """
-        local_episodes = self._manifest[episode.podcast_name]['episode_data']
-        os.remove(local_episodes[episode.title]['uri'])
-        del local_episodes[episode.title]
+        key = PodcastFileManager._to_store_key(episode)
+        self._store.remove(key)
+        del self._manifest[episode.podcast_name]['episode_data'][episode.title]

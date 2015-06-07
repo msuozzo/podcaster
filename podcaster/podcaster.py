@@ -1,10 +1,9 @@
-from local import PodcastFileManager
+from local import PodcastManager
 from rss import get_podcast
 from player import VLCPlayer
 from controller import CmdLineController
 
 from operator import attrgetter, itemgetter
-from datetime import datetime
 
 
 class FormatException(BaseException):
@@ -83,7 +82,7 @@ class Podcaster(object):
     QUIT = -1
     PROMPT = "> "
     def __init__(self):
-        self.manager = PodcastFileManager()
+        self.manager = PodcastManager()
         self.podcasts = []
 
     def run(self):
@@ -92,7 +91,7 @@ class Podcaster(object):
         while current_menu != Podcaster.QUIT:
             print
             current_menu = current_menu()
-        self.manager.close()
+        self.manager.save()
 
     def _get_choice(self, valid_choices):
         choice = None
@@ -108,7 +107,7 @@ class Podcaster(object):
         commands = get_command_series(len(self.podcasts))
         updated = get_series(self.podcasts, "New?",
                                 lambda f: f,
-                                lambda field: "[%s]" % ("X" if self.manager.is_updated(field) else " "))
+                                lambda field: "[%s]" % ("X" if self.manager.has_update(field) else " "))
         names = get_series(self.podcasts, "Podcast",
                             attrgetter('name'))
         lines.extend(symmetric_header_footer(commands, updated, names))
@@ -161,7 +160,7 @@ class Podcaster(object):
         return without_headers
 
     def episodes(self, podcast, base=0):
-        self.manager.check(podcast)
+        self.manager.register_checked(podcast)
         lines = get_menu_header(podcast.name)
         episodes = list(reversed(sorted(podcast.episodes.values(), key=lambda p: p.date_published)))[base:base + 10]
         commands = get_command_series(len(episodes), base + 1)
@@ -206,6 +205,7 @@ class Podcaster(object):
         """Launch the Player to play `episode`
         """
         if not self.manager.is_downloaded(episode):
+            print 'Downloading %s....' % episode.title
             #TODO: Error checking
             self.manager.download_episode(episode)
         uri = self.manager.get_local_uri(episode)
@@ -213,7 +213,7 @@ class Podcaster(object):
         def cb_update_position(player):
             """Update the playback position periodically.
             """
-            self.manager.play_episode(episode, player.get_position())
+            self.manager.set_episode_position(episode, player.get_position())
         controller = CmdLineController(player, cb_update_position)
         controller.run(initial_position=self.manager.get_last_position(episode))
         #TODO: Return to last menu

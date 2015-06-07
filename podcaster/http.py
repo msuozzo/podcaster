@@ -3,21 +3,13 @@ import urllib2
 from bs4 import BeautifulSoup
 
 
-def download_to_file(url, local_fname):
-    #TODO: Add progressbar hook
-    res = get_response(url)
-    if res is None:
-        return None
-    with open(local_fname, 'wb') as local_file:
-        local_file.write(res.read())
-    return local_fname
-
-
 def get_response(url):
     #TODO: throw Exception?
     try:
         return urllib2.urlopen(url)
     except urllib2.HTTPError:
+        return None
+    except urllib2.URLError:
         return None
 
 
