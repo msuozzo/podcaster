@@ -74,8 +74,11 @@ class CmdLineController(object):
         """Run the command loop
         """
         self._player.play()
+        while not self._player.is_playing():
+            pass
         if initial_position is not None:
             self._player.set_position(initial_position)
+
         while True:
             cmd = self._input_getter.get_input(print_prompt=not self._interrupted)
             self._update_callback(self._player)

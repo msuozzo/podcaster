@@ -76,8 +76,9 @@ class SimpleFileStore(object):
             paths.add(entry['path'])
         # Remove any unlisted files
         for fname in os.listdir(self._store_dir):
-            if fname not in paths and fname != self._manifest_fname:
-                os.remove(os.path.join(self._store_dir, fname))
+            path = os.path.join(self._store_dir, fname)
+            if path not in paths and fname != self._manifest_fname:
+                os.remove(path)
 
     def save(self):
         """Save the file metadata to disk (i.e. recoverable when loaded again)
@@ -118,6 +119,11 @@ class SimpleFileStore(object):
         was added to the store.
         """
         return self._manifest[key]['added'] if self.exists(key) else None
+
+    def keys(self):
+        """Return a list of keys contained in the store.
+        """
+        return self._manifest.keys()
 
     def remove(self, key):
         """If the key exists in the store, remove the key and data.

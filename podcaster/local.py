@@ -19,7 +19,7 @@ class PodcastManager(object):
 
     def __init__(self, storage_dir='.podcasts'):
         self._store = SimpleFileStore(storage_dir)
-        self._manifest_fname = PodcastFileManager._MANIFEST_FNAME
+        self._manifest_fname = PodcastManager._MANIFEST_FNAME
         self._manifest = {}
         self._init_manifest()
 
@@ -72,14 +72,14 @@ class PodcastManager(object):
     def is_downloaded(self, episode):
         """Return whether a local copy of the Episode `episode` exists.
         """
-        key = PodcastFileManager._to_store_key(episode)
+        key = PodcastManager._to_store_key(episode)
         return self._store.exists(key)
 
     def get_local_uri(self, episode):
         """If a local copy of `episode` exists, return the URI.
         Else, return None.
         """
-        key = PodcastFileManager._to_store_key(episode)
+        key = PodcastManager._to_store_key(episode)
         if self._store.exists(key):
             return 'file://' + self._store.get_path(key)
         return None
@@ -94,7 +94,7 @@ class PodcastManager(object):
         episode_dict = {'last_position': None}
         local_episodes[episode.title] = episode_dict
 
-        key = PodcastFileManager._to_store_key(episode)
+        key = PodcastManager._to_store_key(episode)
         response = get_response(episode.url)
         if response is None:
             return None
@@ -125,6 +125,6 @@ class PodcastManager(object):
     def delete_episode(self, episode):
         """Delete local file and references to an episode
         """
-        key = PodcastFileManager._to_store_key(episode)
+        key = PodcastManager._to_store_key(episode)
         self._store.remove(key)
         del self._manifest[episode.podcast_name]['episode_data'][episode.title]

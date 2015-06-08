@@ -9,8 +9,8 @@ from datetime import datetime
 
 class DatetimeDecoderTests(unittest.TestCase):
     def test_without_date(self):
-        d = json.loads('{"Foo": {"Bar": "Baz"}}', cls=DatetimeDecoder)
-        self.assertEquals({'Foo': {'Bar': 'Baz'}}, d)
+        decoded_dict = json.loads('{"Foo": {"Bar": "Baz"}}', cls=DatetimeDecoder)
+        self.assertEquals({'Foo': {'Bar': 'Baz'}}, decoded_dict)
 
     def test_with_date(self):
         time_dict = {'Time': datetime.now()}
