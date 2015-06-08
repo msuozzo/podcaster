@@ -1,7 +1,7 @@
-from local import PodcastManager
-from rss import get_podcast
-from player import VLCPlayer
-from controller import CmdLineController
+from podcaster.local import PodcastManager
+from podcaster.rss import get_podcast
+from podcaster.player import VLCPlayer
+from podcaster.controller import CmdLineController
 
 from operator import attrgetter, itemgetter
 

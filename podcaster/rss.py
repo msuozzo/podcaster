@@ -1,9 +1,7 @@
 """Interface with RSS pages
 """
-from http import get_meta_redirect, get_rss_link
-from podcast import Podcast, Episode
-
-from datetime import datetime
+from podcaster.http import get_meta_redirect, get_rss_link
+from podcaster.podcast import Podcast, Episode
 
 import feedparser
 from dateutil import parser
@@ -57,18 +55,8 @@ def _feed_to_obj(feed):
 
 
 def get_podcast(url):
+    """Return a `Podcast` instance built from the feed retrieved from `url`
+
+    url - the url of the feed to be processed
+    """
     return _feed_to_obj(_parse_feed(url))
-
-
-if __name__ == "__main__":
-    import pprint
-
-    hi_url = "http://feeds.podtrac.com/m2lTaLRx8AWb"
-    shorten = lambda s: str(s)[:40] + ("..." if len(str(s)) > 40 else "")
-    feed = _parse_feed(hi_url)
-    for k, v in feed.iteritems():
-        print k, shorten(v)
-    print pprint.pprint(feed.feed)
-    p = _feed_to_obj(feed)
-    print repr(p)
-    print pprint.pprint(feed.entries[0])
