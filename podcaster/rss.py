@@ -33,9 +33,17 @@ def _parse_feed(url):
 def _feed_to_obj(feed):
     """Converts a feedparser feed to a Podcast object
     """
+    if feed is None:
+        return None
+    def has_audio_link(link_dict):
+        """Return whether the link dictionary refers to an audio file
+        """
+        if 'type' in link_dict:
+            return link_dict.type.startswith("audio")
+        return link_dict.href.endswith("mp3")
     episodes = []
     for entry in feed.entries:
-        links = [link.href for link in entry.links if link.type.startswith('audio')]
+        links = [link_dict.href for link_dict in entry.links if has_audio_link(link_dict)]
         if not len(links):
             continue
         link = links[0]
@@ -45,12 +53,16 @@ def _feed_to_obj(feed):
                             entry.get('summary', ''),
                             parser.parse(entry.published))
         episodes.append(episode)
+    if 'updated' in feed:
+        last_updated = parser.parse(feed.updated)
+    else:
+        last_updated = parser.parse('1/1/1970 00:01:00+0000')
     return Podcast(feed.href,
                     feed.feed.title,
+                    last_updated,
                     feed.feed.get('author', ''),
                     feed.feed.get('link', ''),
                     feed.feed.get('summary', ''),
-                    parser.parse(feed.updated),
                     episodes)
 
 

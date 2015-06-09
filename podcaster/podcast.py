@@ -9,8 +9,8 @@ class Podcast(object):
     last_updated - If data is available, a datetime object representing the
                     last time the feed was modified, else None
     """
-    def __init__(self, rss_url, name, author='', site_url='',
-            description='', last_updated=None, episodes=None):
+    def __init__(self, rss_url, name, last_updated, author='', site_url='',
+            description='', episodes=None):
         self.rss_url = rss_url
         self.name = name
         self.author = author

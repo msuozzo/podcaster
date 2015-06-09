@@ -224,7 +224,3 @@ class Podcaster(object):
         print "Updating feeds..."
         self.podcasts = [get_podcast(link) for _, link in self.manager.links().iteritems()]
         print "All data retrieved"
-
-
-if __name__ == "__main__":
-    Podcaster().run()

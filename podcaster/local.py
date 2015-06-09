@@ -1,6 +1,8 @@
-from http import get_response
-from datetime_json import DatetimeEncoder, DatetimeDecoder
-from store import SimpleFileStore
+"""Metadata manager for the podcasts and episodes
+"""
+from podcaster.http import get_response
+from podcaster.datetime_json import DatetimeEncoder, DatetimeDecoder
+from podcaster.store import SimpleFileStore
 
 import os
 import json
@@ -10,12 +12,11 @@ from dateutil import parser
 from dateutil.tz import tzutc
 
 
-#TODO: Refactor the os operations to another class
 #TODO: Refactor everything. This is a monstrosity.
 class PodcastManager(object):
     """Manages the local files and metadata for the podcasts
     """
-    _MANIFEST_FNAME = '.podcaster.dat'
+    _MANIFEST_FNAME = '.podcaster.json'
 
     def __init__(self, storage_dir='.podcasts'):
         self._store = SimpleFileStore(storage_dir)
@@ -103,6 +104,10 @@ class PodcastManager(object):
         return self.get_local_uri(episode)
 
     def _get_episode_dict(self, episode):
+        """Return the dict containging data about `episode`
+
+        KeyError if episode dict not found
+        """
         return self._manifest[episode.podcast_name]['episode_data'][episode.title]
 
     def set_episode_position(self, episode, curr_seconds):
