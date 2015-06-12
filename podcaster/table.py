@@ -14,7 +14,7 @@ class TextTable(object):
     """
     def __init__(self, cell_buffer=1):
         self._cell_buffer = cell_buffer
-        self._seps = (' ',)
+        self._seps = ('', '')
         self._rows = []
 
     def set_seps(self, *args):
@@ -57,15 +57,18 @@ class TextTable(object):
         align_func = str.ljust if align == 'l' else \
                      str.center if align == 'c' else \
                      str.rjust
-        seps = self._seps if seps is None else seps
-        if len(cells) != len(seps) - 1:
+        old = self._seps[:]
+        if seps is not None:
+            self.set_seps(*seps)
+        if len(cells) != len(self._seps) - 1:
             raise FormatError('Incorrect number of cells provided (got %d, needed %d)' %
-                    (len(cells), len(seps) - 1))
-        row = {'seps': seps,
+                    (len(cells), len(self._seps) - 1))
+        row = {'seps': self._seps,
                 'cells': map(str, cells),
                 'fill': fill_char,
                 'align': align_func}
         self._rows.append(row)
+        self.set_seps(*old)
 
     def add_break_row(self, fill_char='-', seps=None):
         """Add a row designed to break up grid sections
@@ -131,7 +134,7 @@ class TextTable(object):
         for row in self._rows:
             # Pad cells to proper widths
             padded = self._pad_row(row['cells'], widths, row['align'], row['fill'])
-            # Join cells
+            # Interleave seps with cells
             all_elems = list(chain(*zip(row['seps'], padded))) + [row['seps'][-1]]
             buffer_ = row['fill'] * self._cell_buffer
             line = buffer_.join(all_elems)
