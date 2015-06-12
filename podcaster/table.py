@@ -13,9 +13,8 @@ class TextTable(object):
     """An ASCII table formatter
     """
     def __init__(self, cell_buffer=1):
-        self.num_cols = 1
         self._cell_buffer = cell_buffer
-        self._seps = tuple(' ' for _ in xrange(self.num_cols + 1))
+        self._seps = (' ',)
         self._rows = []
 
     def set_seps(self, *args):
@@ -34,14 +33,13 @@ class TextTable(object):
         if len(args) < 2:
             raise FormatError('Invalid number of separators provided (got %d, needed at least 2)' %
                     len(args))
-        self.num_cols = len(args) - 1
         invalid_seps = [arg for arg in args if len(arg) > 1]
         if invalid_seps:
             sep_str = ', '.join(["'%s'" % sep for sep in invalid_seps])
             raise FormatError('Separators must be of length <=1: {%s}' % sep_str)
         self._seps = tuple(args)
 
-    def add_row(self, cells, fill_char=' ', align='l'):
+    def add_row(self, cells, fill_char=' ', align='l', seps=None):
         """Add a row of cells to the grid
 
         cells: an iterable of the cells (strs)
@@ -49,6 +47,8 @@ class TextTable(object):
         fill_char: character with which to pad the cells (default: ' ')
         align: how to align the string in the cell (default: 'l')
             Valid choices: 'l' (align left), 'c' (center), or 'r' (align right)
+        seps: an iterable of column separators that, if provided, overrive the ones set by `set_seps`.
+            Future added rows will not use these seps i.e. they are not remembered.
         """
         if len(fill_char) != 1:
             raise FormatError('fill char must be a single character')
@@ -57,22 +57,26 @@ class TextTable(object):
         align_func = str.ljust if align == 'l' else \
                      str.center if align == 'c' else \
                      str.rjust
-        if len(cells) != self.num_cols:
+        seps = self._seps if seps is None else seps
+        if len(cells) != len(seps) - 1:
             raise FormatError('Incorrect number of cells provided (got %d, needed %d)' %
-                    (len(cells), self.num_cols))
-        row = {'seps': self._seps,
-                'cells': cells,
+                    (len(cells), len(seps) - 1))
+        row = {'seps': seps,
+                'cells': map(str, cells),
                 'fill': fill_char,
                 'align': align_func}
         self._rows.append(row)
 
-    def add_break_row(self, fill_char='-'):
+    def add_break_row(self, fill_char='-', seps=None):
         """Add a row designed to break up grid sections
         Break rows still contain seps but are otherwise composed solely of `fill_char`s
 
         fill_char: the character to fill the entire row (aside from the seps)
+        seps: an iterable of column separators that, if provided, overrive the ones set by `set_seps`.
+            Future added rows will not use these seps i.e. they are not remembered.
         """
-        self.add_row(['' for _ in xrange(self.num_cols)], fill_char=fill_char)
+        seps = self._seps if seps is None else seps
+        self.add_row(['' for _ in xrange(len(seps) - 1)], fill_char=fill_char, seps=seps)
 
     def _calculate_column_widths(self):
         """Return a list of the maximum lengths each column should be to

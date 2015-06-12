@@ -2,80 +2,53 @@ from podcaster.local import PodcastManager
 from podcaster.rss import get_podcast
 from podcaster.player import VLCPlayer
 from podcaster.controller import CmdLineController
+from podcaster.table import TextTable
 
 from operator import attrgetter, itemgetter
 
 
-class FormatException(BaseException):
-    pass
-
-
-def get_menu_header(name, fill='='):
-    return [name, len(name) * fill]
-
-
-def get_series(objs, name, getter, formatter=lambda f: f):
-    header_row = [] if name is None else [name]
-    return header_row + [formatter(getter(obj)) for obj in objs]
-
-
-def get_command_series(num_objs, start=1):
-    return ["CMD"] + map(str, range(start, start + num_objs))
-
-
-def pad_series(series, has_header, width=None, pad_char=' '):
-    """Return the series arg with each element padded to the length of the
-    longest element or `width` if it is provided.
-
-    has_header - if True, the zeroeth element will be centered
-    width - if provided, series will be padded to max(width, max_elem_length)
-    pad_char - char with which to pad the series
+def build_data_rows(ind_to_key, obj_lst, *series_args):
     """
-    padded_width = max(map(len, series)) if width is None else width
-    first_func = str.center if has_header else str.ljust
-    first = first_func(series[0], padded_width, pad_char)
-    return [first] + [elem.ljust(padded_width, pad_char) for elem in series[1:]]
 
-FIELD_PADDING = 1
-
-def join_series(format_tuple, *args):
+    *series_args: 3-tuples of (series_name, obj_to_data, data_to_str)
+        where the latter two elements are functions converting the 
     """
-    format_tuple - (fill_char, separation_char)
-    """
-    lens = map(len, args)
-    if not all(l == lens[0] for l in lens):
-        raise FormatException("Series not of equal length")
-    num_rows = lens[0]
-    if num_rows == 0:
-        return ["  There's nothing here...."]
-    char, sep = format_tuple
-    padded_sep = sep.center(len(sep) + 2 * FIELD_PADDING, char)
-    return [padded_sep.join(map(itemgetter(i), args)) for i in xrange(num_rows)]
+    rows = [['CMD'] + [name for name, _, _ in series_args]]
+    for ind, obj in enumerate(obj_lst):
+        row = [ind_to_key(ind)] + [fmt(extract(obj)) for _, extract, fmt in series_args]
+        rows.append(row)
+    return rows
 
+def build_menu(title, data_rows, action_rows):
+    menu = TextTable()
 
-def series_break(format_tuple, *args):
-    widths = [len(arg[0]) for arg in args]
-    char, sep = format_tuple
-    padded_sep = sep.center(len(sep) + 2 * FIELD_PADDING, char)
-    return padded_sep.join([char * width for width in widths])
+    # Add table title
+    menu.add_break_row(seps=('+', '+'))
+    menu.add_row((title,), align='c', seps=('|', '|'))
+    menu.add_break_row(seps=('+', '+'))
 
+    # Add data section
+    num_series = len(data_rows[0]) - 2
+    name_seps = ('|', '|') + num_series * ('|',) + ('|',)
+    header_seps = ('+', '+') + num_series * ('v',) + ('+',)
+    data_seps = ('|', '|') + num_series * (' ',) + ('|',)
+    footer_seps = ('+', '+') + num_series * ('^',) + ('+',)
+    menu.add_row(data_rows[0], align='c', seps=name_seps)
+    menu.add_break_row(seps=header_seps)
+    menu.set_seps(*data_seps)
+    for data_row in data_rows[1:]:
+        menu.add_row(data_row)
+    if len(data_rows) == 1:
+        menu.add_row(('There\'s nothing here...',), seps=('?', '?'))
+    menu.add_break_row(seps=footer_seps)
 
-def symmetric_header_footer(*series):
-    #import pdb; pdb.set_trace()
-    # Pad with header
-    padded_series = [pad_series(s, True) for s in series]
-    header_format = (' ', '|')
-    series_format = (' ', ' ')
-    top_break_format = ('-', 'v')
-    bot_break_format = ('-', '^')
-    # Format header
-    ret = join_series(header_format, *[s[:1] for s in padded_series])
-    ret.append(series_break(top_break_format, *padded_series))
-    # Format series
-    ret.extend(join_series(series_format, *[s[1:] for s in padded_series]))
-    # Format footer
-    ret.append(series_break(bot_break_format, *padded_series))
-    return ret
+    # Add action section
+    menu.set_seps('|', '|', '|')
+    for action_row in action_rows:
+        menu.add_row(action_row)
+    menu.add_break_row(seps=('+', '+', '+'))
+
+    return str(menu)
 
 
 class Podcaster(object):
@@ -103,32 +76,30 @@ class Podcaster(object):
                 return choice
 
     def all_podcasts(self):
-        lines = get_menu_header('All Podcasts')
-        commands = get_command_series(len(self.podcasts))
-        updated = get_series(self.podcasts, "New?",
-                                lambda f: f,
-                                lambda field: "[%s]" % ("X" if self.manager.has_update(field) else " "))
-        names = get_series(self.podcasts, "Podcast",
-                            attrgetter('name'))
-        lines.extend(symmetric_header_footer(commands, updated, names))
-
-        actions = {}
-        for i, podcast in enumerate(self.podcasts):
-            actions[str(i + 1)] = lambda p=podcast: self.episodes(p)
-
-        more_actions = {
-                ('a', 'Add a new podcast URL'): self.add_podcast,
-                ('t', 'View Downloaded Episodes'): self.downloaded_podcasts,
-                ('q', 'Quit'): Podcaster.QUIT
+        # Build menu data
+        new_series = ("New?", lambda f: f,
+                        lambda podcast: '[X]' if self.manager.has_update(podcast) else "[ ]")
+        name_series = ("Podcast", attrgetter('name'), lambda f: f)
+        to_key = lambda i: str(i + 1)
+        data_rows = build_data_rows(to_key, self.podcasts, new_series, name_series)
+        # Build menu actions
+        other_actions = {
+                'a': ('Add a new podcast URL', self.add_podcast),
+                't': ('View Downloaded Episodes', self.downloaded_podcasts),
+                'q': ('Quit', Podcaster.QUIT)
             }
+        action_rows = [(cmd, desc) for cmd, (desc, _) in other_actions.iteritems()]
+        # Build menu
+        menu_text = build_menu('All Podcasts', data_rows, action_rows)
 
-        #FIXME: remove hard-codeyness
-        lines.extend(self._format_more_actions(more_actions, len(lines[2]) - 6))
-
-        for (cmd, _), action in more_actions.iteritems():
+        # Build action table
+        actions = {}
+        for ind, podcast in enumerate(self.podcasts):
+            actions[to_key(ind)] = lambda p=podcast: self.episodes(p)
+        for cmd, (_, action) in other_actions.iteritems():
             actions[cmd] = action
 
-        print "\n".join(lines)
+        print menu_text
 
         choice = self._get_choice(actions.keys())
         return actions[choice]
@@ -148,51 +119,45 @@ class Podcaster(object):
                 print 'Not adding "%s"' % new_podcast.name
         return self.all_podcasts
 
-    def _format_more_actions(self, more_actions, width):
-        more_commands = get_series(sorted(more_actions.keys()), 'CMD',
-                                    itemgetter(0))
-        description = get_series(sorted(more_actions.keys()), 'Action',
-                                    itemgetter(1))
-        #FIXME: Previous lines may be shorter and will not be padded to this increased size
-        padded_desc = pad_series(description, True, width=width)
-        more_lines = symmetric_header_footer(more_commands, padded_desc)
-        without_headers = more_lines[2:]
-        return without_headers
-
     def episodes(self, podcast, base=0):
         self.manager.register_checked(podcast)
-        lines = get_menu_header(podcast.name)
-        episodes = list(reversed(sorted(podcast.episodes.values(), key=lambda p: p.date_published)))[base:base + 10]
-        commands = get_command_series(len(episodes), base + 1)
-        dates = get_series(episodes, "Date",
-                            attrgetter('date_published'),
-                            lambda field: field.strftime('%m/%d'))
-        dld = get_series(episodes, "DLD?",
-                            lambda f: f,
-                            lambda field: "[%s]" % ("X" if self.manager.is_downloaded(field) else " "))
-        names = get_series(episodes, "Episode",
-                            attrgetter('title'))
-        lines.extend(symmetric_header_footer(commands, dates, dld, names))
 
-        actions = {}
-        for i, episode in enumerate(episodes):
-            actions[str(i + 1)] = lambda e=episode: self.play(e)
-
-        more_actions = {
-                ('b', 'Back to All Podcasts'): self.all_podcasts,
-                ('q', 'Quit'): Podcaster.QUIT
+        # Build menu data
+        by_date = sorted(podcast.episodes.values(), key=lambda p: p.date_published)
+        # extract the 10 episodes prior to `base`
+        episodes = list(reversed(by_date))[base:base + 10]
+        date_series = ("Date",
+                        attrgetter('date_published'),
+                        lambda field: field.strftime('%m/%d'))
+        dld_series = ("DLD?",
+                        lambda f: f,
+                        lambda field: "[%s]" % ("X" if self.manager.is_downloaded(field) else " "))
+        title_series = ("Episode",
+                        attrgetter('title'),
+                        lambda f: f)
+        to_key = lambda i: str(i + 1)
+        data_rows = build_data_rows(to_key, episodes, date_series, dld_series, title_series)
+        # Build menu actions
+        other_actions = {
+                'b': ('Back to All Podcasts', self.all_podcasts),
+                'q': ('Quit', Podcaster.QUIT)
             }
         if base + 10 <= len(podcast.episodes):
-            more_actions[('n', 'Next Page')] = lambda: self.episodes(podcast, base + 10)
+            other_actions['n'] = ('Next Page', lambda: self.episodes(podcast, base + 10))
         if base > 0:
-            more_actions[('p', 'Previous Page')] = lambda: self.episodes(podcast, base - 10)
-        #FIXME: remove hard-codeyness
-        lines.extend(self._format_more_actions(more_actions, len(lines[2]) - 6))
+            other_actions['p'] = ('Previous Page', lambda: self.episodes(podcast, base - 10))
+        action_rows = [(cmd, desc) for cmd, (desc, _) in other_actions.iteritems()]
+        # Build menu
+        menu_text = build_menu(podcast.name, data_rows, action_rows)
 
-        for (cmd, _), action in more_actions.iteritems():
+        actions = {}
+        cb_return_menu = lambda: self.episodes(podcast, base)
+        for ind, episode in enumerate(episodes):
+            actions[to_key(ind)] = lambda e=episode: self.play(e, cb_return_menu)
+        for cmd, (_, action) in other_actions.iteritems():
             actions[cmd] = action
 
-        print "\n".join(lines)
+        print menu_text
 
         choice = self._get_choice(actions.keys())
         return actions[choice]
@@ -201,7 +166,7 @@ class Podcaster(object):
         #TODO
         return Podcaster.QUIT
 
-    def play(self, episode):
+    def play(self, episode, cb_return_menu):
         """Launch the Player to play `episode`
         """
         if not self.manager.is_downloaded(episode):
@@ -216,9 +181,8 @@ class Podcaster(object):
             self.manager.set_episode_position(episode, player.get_position())
         controller = CmdLineController(player, cb_update_position)
         controller.run(initial_position=self.manager.get_last_position(episode))
-        #TODO: Return to last menu
 
-        return Podcaster.QUIT
+        return cb_return_menu
 
     def update(self):
         print "Updating feeds..."
