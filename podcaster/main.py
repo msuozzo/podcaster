@@ -4,20 +4,23 @@ from podcaster.player import VLCPlayer
 from podcaster.controller import CmdLineController
 from podcaster.table import TextTable
 
-from operator import attrgetter, itemgetter
+from operator import attrgetter
+from itertools import ifilter, chain
 
 
 def build_data_rows(ind_to_key, obj_lst, *series_args):
     """
 
     *series_args: 3-tuples of (series_name, obj_to_data, data_to_str)
-        where the latter two elements are functions converting the 
+        where the latter two elements are functions converting each object to
+        data and the data to a string, respectively.
     """
     rows = [['CMD'] + [name for name, _, _ in series_args]]
     for ind, obj in enumerate(obj_lst):
         row = [ind_to_key(ind)] + [fmt(extract(obj)) for _, extract, fmt in series_args]
         rows.append(row)
     return rows
+
 
 def build_menu(title, data_rows, action_rows):
     menu = TextTable()
@@ -163,8 +166,45 @@ class Podcaster(object):
         return actions[choice]
 
     def downloaded_podcasts(self):
-        #TODO
-        return Podcaster.QUIT
+        # Build menu data
+        all_episodes = chain.from_iterable(podcast.episodes.values() for podcast in self.podcasts)
+        downloaded_episodes = ifilter(lambda e: self.manager.is_downloaded(e), all_episodes)
+        by_date = list(reversed(sorted(downloaded_episodes,
+                                        key=lambda e: self.manager.get_date_added(e))))
+
+        # extract the 10 episodes prior to `base`
+        date_series = ("Date",
+                        lambda e: self.manager.get_date_added(e),
+                        lambda field: field.strftime('%m/%d'))
+        title_series = ("Episode",
+                        attrgetter('title'),
+                        lambda f: f)
+        podcast_series = ("Podcast",
+                        attrgetter('podcast_name'),
+                        lambda f: f)
+        to_key = lambda i: str(i + 1)
+        data_rows = build_data_rows(to_key, by_date, date_series, title_series, podcast_series)
+        # Build menu actions
+        other_actions = {
+                'b': ('Back to All Podcasts', self.all_podcasts),
+                'q': ('Quit', Podcaster.QUIT)
+            }
+
+        action_rows = [(cmd, desc) for cmd, (desc, _) in other_actions.iteritems()]
+        # Build menu
+        menu_text = build_menu('Downloaded Episodes', data_rows, action_rows)
+
+        actions = {}
+        cb_return_menu = self.downloaded_podcasts
+        for ind, episode in enumerate(by_date):
+            actions[to_key(ind)] = lambda e=episode: self.play(e, cb_return_menu)
+        for cmd, (_, action) in other_actions.iteritems():
+            actions[cmd] = action
+
+        print menu_text
+
+        choice = self._get_choice(actions.keys())
+        return actions[choice]
 
     def play(self, episode, cb_return_menu):
         """Launch the Player to play `episode`

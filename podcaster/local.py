@@ -85,6 +85,15 @@ class PodcastManager(object):
             return 'file://' + self._store.get_path(key)
         return None
 
+    def get_date_added(self, episode):
+        """If a local copy of `episode` exists, return the date added.
+        Else, return None.
+        """
+        key = PodcastManager._to_store_key(episode)
+        if self._store.exists(key):
+            return self._store.get_date_added(key)
+        return None
+
     def download_episode(self, episode):
         """Download an episode to the local machine
 
