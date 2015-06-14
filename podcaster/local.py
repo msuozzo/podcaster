@@ -51,7 +51,8 @@ class PodcastManager(object):
         self._manifest[podcast.name] = {
                 'last_checked': parser.parse('1/1/1970 00:01:00+0000'),
                 'episode_data': {},
-                'rss_url': podcast.rss_url
+                'rss_url': podcast.rss_url,
+                'preferred_playback_rate': 1.0
             }
 
     def has_update(self, podcast):
@@ -63,6 +64,18 @@ class PodcastManager(object):
         """Register the Podcast object as having been checked.
         """
         self._manifest[podcast.name]['last_checked'] = datetime.now(tzutc())
+
+    def get_preferred_playback_rate(self, podcast):
+        """If a local copy of `episode` exists, return the date added.
+        Else, return None.
+        """
+        return self._manifest[podcast.name]['preferred_playback_rate']
+
+    def set_preferred_playback_rate(self, podcast, rate):
+        """If a local copy of `episode` exists, return the date added.
+        Else, return None.
+        """
+        self._manifest[podcast.name]['preferred_playback_rate'] = rate
 
     @staticmethod
     def _to_store_key(episode):

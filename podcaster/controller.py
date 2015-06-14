@@ -26,6 +26,13 @@ class TimeoutInput(object):
 
     def get_input(self, print_prompt=True):
         """Prompt the user for input.
+
+        print_prompt - print the prompt string (`self.prompt`).
+        """
+        return raw_input(self.prompt if print_prompt else '')
+
+    def get_async_input(self, print_prompt=True):
+        """Prompt the user for input.
         If the user responds within `self.timeout` seconds, return the user's input.
         Else, return None.
 
@@ -35,7 +42,7 @@ class TimeoutInput(object):
         """
         signal.alarm(self.timeout)
         try:
-            input_ = raw_input(self.prompt if print_prompt else '')
+            input_ = self.get_input(print_prompt)
         except TimeoutError:
             return None
         else:
@@ -70,17 +77,32 @@ class CmdLineController(object):
         self._finished = False
         self._input_getter = TimeoutInput()
 
-    def run(self, initial_position=None):
+    def run(self, initial_rate=None, initial_position=None):
         """Run the command loop
         """
+        initial_rate = 1.0 if initial_rate is None else initial_rate
+        if initial_position is not None:
+            print 'Skip to %d seconds in (y/N)' % initial_position
+            old = self._input_getter.prompt
+            self._input_getter.prompt = '? '
+            cmd = self._input_getter.get_input()
+            self._input_getter.prompt = old
+            use_initial_position = cmd == 'y'
+
         self._player.play()
         while not self._player.is_playing():
             pass
-        if initial_position is not None:
+        # initialize playback
+        if use_initial_position:
             self._player.set_position(initial_position)
+        self._player.set_playback_rate(initial_rate)
+        # print help
+        self._print_position()
+        self._print_playback_rate()
+        self._print_help()
 
         while True:
-            cmd = self._input_getter.get_input(print_prompt=not self._interrupted)
+            cmd = self._input_getter.get_async_input(print_prompt=not self._interrupted)
             self._update_callback(self._player)
             # If playback finishes, end the player regardless of the user command
             if self._player.is_finished() or cmd == 'q':
@@ -91,6 +113,7 @@ class CmdLineController(object):
             elif not self._interrupted:
                 print 'Invalid Command'
                 self._print_help()
+        self._player.stop()
 
     def _print_playback_rate(self):
         """Print the current playback rate

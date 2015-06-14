@@ -215,12 +215,17 @@ class Podcaster(object):
             self.manager.download_episode(episode)
         uri = self.manager.get_local_uri(episode)
         player = VLCPlayer(uri)
+        by_name = {podcast.name: podcast for podcast in self.podcasts}
+        podcast = by_name[episode.podcast_name]
         def cb_update_position(player):
             """Update the playback position periodically.
             """
             self.manager.set_episode_position(episode, player.get_position())
+            self.manager.set_preferred_playback_rate(podcast,
+                                                        player.get_playback_rate())
         controller = CmdLineController(player, cb_update_position)
-        controller.run(initial_position=self.manager.get_last_position(episode))
+        controller.run(initial_rate=self.manager.get_preferred_playback_rate(podcast),
+                        initial_position=self.manager.get_last_position(episode))
 
         return cb_return_menu
 
