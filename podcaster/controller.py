@@ -88,6 +88,8 @@ class CmdLineController(object):
             cmd = self._input_getter.get_input()
             self._input_getter.prompt = old
             use_initial_position = cmd == 'y'
+        else:
+            use_initial_position = False
 
         self._player.play()
         while not self._player.is_playing():
