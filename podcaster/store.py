@@ -98,6 +98,8 @@ class SimpleFileStore(object):
         key - the string to be mapped to `data`
         data - the data to be associated with `key`
         """
+        if isinstance(data, file):
+            return self.put(key, data.read())
         if self.exists(key):
             self.remove(key)
         fname = self._key_to_fname(key)

@@ -1,8 +1,8 @@
 """Provide an interface for interaction with URLs and HTTP pages
 """
 import socket
-import urllib
-import urllib2
+from urllib import urlretrieve
+from urllib2 import urlopen, HTTPError, URLError
 from urlparse import urlparse
 
 from bs4 import BeautifulSoup
@@ -31,11 +31,11 @@ def set_global_timeout(timeout=5):
     socket.setdefaulttimeout(timeout)
 
 
-def download_to_file(url, fname, reporthook=None):
+def download_to_file(url, fname=None, reporthook=None):
     """Wrapper around urllib.urlretrieve
     """
     try:
-        urllib.urlretrieve(url, fname, reporthook)
+        return urlretrieve(url, fname, reporthook)
     except IOError as err:
         raise ConnectionError('Failed to establish connection: %s' % err)
 
@@ -49,42 +49,20 @@ def default_to_http(url):
 
 
 def test_connection():
-    """Return whether
+    """Return whether the internet connection is up.
     """
     try:
-        get_response('http://www.google.com')
-    except (ResponseError, ConnectionError):
+        urlopen('http://www.google.com')
+    except (HTTPError, URLError):
         return False
     else:
         return True
 
 
-def get_response(url):
-    """Return a file handle for the resource at `url`
-
-    Args:
-        url: the url identifying the resource that should be retrieved
-
-    Raises:
-        URLError: on basic connection errors
-        ConnectionError: on HTTP errors
-    """
-    try:
-        return urllib2.urlopen(url)
-    except urllib2.HTTPError as http_err:
-        raise ResponseError('Received HTTP Response %d from url %s: %s' %
-                (http_err.code, http_err.geturl(), http_err.info()))
-    except urllib2.URLError as url_err:
-        raise ConnectionError('Failed to complete request: %s', url_err.reason)
-    except ValueError as err:
-        raise ConnectionError('Failed to complete request: %s', err)
-
-
 def get_soup(url):
     """Return a BeautifulSoup instance for the contents of `url`
     """
-    page = get_response(url)
-    return BeautifulSoup(page.read(), 'lxml')
+    return BeautifulSoup(urlopen(url).read(), 'lxml')
 
 
 def _meta_redirect(soup):
@@ -101,8 +79,8 @@ def get_meta_redirect(url):
     """
     try:
         soup = get_soup(url)
-    except ResponseError:
-        pass
+    except HTTPError:
+        soup = None
     return _meta_redirect(soup) if soup is not None else None
 
 
@@ -120,8 +98,8 @@ def get_rss_link(url):
     """
     try:
         soup = get_soup(url)
-    except ResponseError:
-        pass
+    except HTTPError:
+        soup = None
     return _rss_link(soup) if soup is not None else None
 
 

@@ -6,6 +6,7 @@ from podcaster.table import TextTable
 
 from operator import attrgetter
 from itertools import ifilter, chain
+import sys
 
 
 def build_data_rows(ind_to_key, obj_lst, *series_args):
@@ -215,8 +216,25 @@ class Podcaster(object):
         """
         if not self.manager.is_downloaded(episode):
             print 'Downloading %s....' % episode.title
-            #TODO: Error checking
-            self.manager.download_episode(episode)
+            # Create a closure around mutable `current_progress`
+            current_progress = [.0]
+            progress_step = .1
+            def cb_progress(ratio):
+                """Output the download progress at intervals of `progress_step`
+
+                Modification of `current_progress` element allows state to
+                persist across calls so that progress output can be triggered
+                at set increments.
+                """
+                if ratio is not None and current_progress[0] < ratio:
+                    print '%d%% ' % (100 * ratio),
+                    sys.stdout.flush()
+                    current_progress[0] += progress_step
+            if self.manager.download_episode(episode, cb_progress) is None:
+                print 'Download failed'
+                return cb_return_menu
+            else:
+                print '\nDownload complete!\n'
         uri = self.manager.get_local_uri(episode)
         player = VLCPlayer(uri)
         by_name = {podcast.name: podcast for podcast in self.podcasts}

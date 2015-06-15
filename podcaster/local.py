@@ -1,6 +1,6 @@
 """Metadata manager for the podcasts and episodes
 """
-from podcaster.http import get_response
+from podcaster.http import download_to_file, ConnectionError
 from podcaster.datetime_json import DatetimeEncoder, DatetimeDecoder
 from podcaster.store import SimpleFileStore
 
@@ -12,7 +12,6 @@ from dateutil import parser
 from dateutil.tz import tzutc
 
 
-#TODO: Refactor everything. This is a monstrosity.
 class PodcastManager(object):
     """Manages the local files and metadata for the podcasts
     """
@@ -107,23 +106,47 @@ class PodcastManager(object):
             return self._store.get_date_added(key)
         return None
 
-    def download_episode(self, episode):
+    def download_episode(self, episode, cb_progress=None):
         """Download an episode to the local machine
 
         On success: the local path to the episode
         On failure: None
+
+        Args:
+            episode: the `Episode` instance to download
+            cb_progress: a callback function accepting a single parameter.
+                If the download progress is available, this parameter will be
+                the current download progress expressed as a number between 0.0
+                and 1.0 (1.0 being complete).
+                If the progress is not available, this parameter will be None.
         """
         local_episodes = self._manifest[episode.podcast_name]['episode_data']
         episode_dict = {'last_position': None}
         local_episodes[episode.title] = episode_dict
 
-        key = PodcastManager._to_store_key(episode)
-        response = get_response(episode.url)
-        if response is None:
+        # Define callback closure to convert download callback format to progress format
+        if cb_progress is not None:
+            def cb_report(chunk_num, chunk_size, total_size):
+                """Return the completion ratio of the download if available.
+                Else, return None
+                """
+                if total_size != -1:
+                    cb_progress((1. * chunk_size * chunk_num) / total_size)
+                else:
+                    cb_progress(None)
+        else:
+            cb_report = None
+
+        # Attempt download
+        try:
+            local_fname, _ = download_to_file(episode.url, reporthook=cb_report)
+        except ConnectionError:
             return None
-        file_data = response.read()
-        self._store.put(key, file_data)
-        return self.get_local_uri(episode)
+        else:
+            key = PodcastManager._to_store_key(episode)
+            with open(local_fname, 'rb') as file_:
+                self._store.put(key, file_)
+            return self.get_local_uri(episode)
 
     def _get_episode_dict(self, episode):
         """Return the dict containging data about `episode`
