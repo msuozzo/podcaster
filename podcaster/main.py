@@ -108,17 +108,21 @@ class Podcaster(object):
         return actions[choice]
 
     def add_podcast(self):
-        url = raw_input('Enter URL (empty to cancel): ')
-        if url:
+        while True:
+            url = raw_input('Enter Podcast URL (empty to cancel): ')
+            if not url:
+                break
             print 'Retrieving feed information'
-            #TODO: Error Handling
             new_podcast = get_podcast(url)
-            add_check = raw_input('Add "%s" (y/N)? ' % new_podcast.name)
-            if add_check == 'y':
-                self.manager.add_podcast(new_podcast)
-                self.podcasts.append(new_podcast)
-                print 'Successfully added "%s"' % new_podcast.name
+            if new_podcast is None:
+                print 'Failed to extract a Podcast RSS feed from URL'
             else:
+                add_check = raw_input('Add "%s" (y/N)? ' % new_podcast.name)
+                if add_check == 'y':
+                    self.manager.add_podcast(new_podcast)
+                    self.podcasts.append(new_podcast)
+                    print 'Successfully added "%s"' % new_podcast.name
+                    break
                 print 'Not adding "%s"' % new_podcast.name
         return self.all_podcasts
 

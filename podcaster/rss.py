@@ -11,22 +11,19 @@ def _parse_feed(url):
     """Return feed structured via feedparser on success.
     None on failure
     """
+    if url is None:
+        return
     # first try to parse directly
     parsed_feed = feedparser.parse(url)
 
     # fall back to searching for an rss link
     if parsed_feed.bozo:
-        #TODO: Generalize fallbacks
-        # try to find an rss_link
-        rss_link = get_rss_link(url)
-        if rss_link is not None:
-            return _parse_feed(rss_link)
-
-        # try to find a redirect within the page
-        redirect_url = get_meta_redirect(url)
-        if redirect_url is not None:
-            return _parse_feed(redirect_url)
-        return None
+        fallbacks = (get_rss_link, get_meta_redirect)
+        for fallback in fallbacks:
+            feed = _parse_feed(fallback(url))
+            if feed is not None:
+                return feed
+        return
     return parsed_feed if parsed_feed.feed else None
 
 
