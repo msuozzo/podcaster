@@ -47,8 +47,9 @@ class TextTable(object):
         fill_char: character with which to pad the cells (default: ' ')
         align: how to align the string in the cell (default: 'l')
             Valid choices: 'l' (align left), 'c' (center), or 'r' (align right)
-        seps: an iterable of column separators that, if provided, overrive the ones set by `set_seps`.
-            Future added rows will not use these seps i.e. they are not remembered.
+        seps: an iterable of column separators that, if provided, overrive the
+            ones set by `set_seps`. Future added rows will not use these seps i.e.
+            they are not remembered.
         """
         if len(fill_char) != 1:
             raise FormatError('fill char must be a single character')
@@ -75,8 +76,9 @@ class TextTable(object):
         Break rows still contain seps but are otherwise composed solely of `fill_char`s
 
         fill_char: the character to fill the entire row (aside from the seps)
-        seps: an iterable of column separators that, if provided, overrive the ones set by `set_seps`.
-            Future added rows will not use these seps i.e. they are not remembered.
+        seps: an iterable of column separators that, if provided, overrive the
+            ones set by `set_seps`. Future added rows will not use these seps i.e.
+            they are not remembered.
         """
         seps = self._seps if seps is None else seps
         self.add_row(['' for _ in xrange(len(seps) - 1)], fill_char=fill_char, seps=seps)
