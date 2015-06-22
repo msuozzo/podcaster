@@ -1,7 +1,6 @@
 """Interface with RSS pages
 """
 from podcaster.http import get_meta_redirect, get_rss_link
-from podcaster.podcast import Podcast, Episode
 
 import feedparser
 from dateutil import parser
@@ -27,40 +26,38 @@ def _parse_feed(url):
     return parsed_feed if parsed_feed.feed else None
 
 
-def _feed_to_obj(feed):
-    """Converts a feedparser feed to a Podcast object
+def _podcast_data(feed):
+    """Return podcast data from the feedparser feed `feed`
     """
     if feed is None:
         return None
+    last_updated = parser.parse(feed.updated) if 'updated' in feed else \
+                    parser.parse(feed.feed.updated) if 'updated' in feed.feed else \
+                    None
+    return (feed.feed.title, feed.href, last_updated,
+                feed.feed.get('author', ''), feed.feed.get('link', ''),
+                feed.feed.get('summary', ''))
+
+
+def _episode_iter(feed):
+    """Return an iterator over the episodes of the podcast contained in the
+    feedparser feed `feed`
+    """
+    if feed is None:
+        raise StopIteration()
     def has_audio_link(link_dict):
         """Return whether the link dictionary refers to an audio file
         """
         if 'type' in link_dict:
             return link_dict.type.startswith("audio")
         return link_dict.href.endswith("mp3")
-    episodes = []
     for entry in feed.entries:
         links = [link_dict.href for link_dict in entry.links if has_audio_link(link_dict)]
         if not len(links):
             continue
-        link = links[0]
-        episode = Episode(link,
-                            entry.get('title', ''),
-                            feed.feed.title,
-                            entry.get('summary', ''),
-                            parser.parse(entry.published))
-        episodes.append(episode)
-    if 'updated' in feed:
-        last_updated = parser.parse(feed.updated)
-    else:
-        last_updated = parser.parse('1/1/1970 00:01:00+0000')
-    return Podcast(feed.href,
-                    feed.feed.title,
-                    last_updated,
-                    feed.feed.get('author', ''),
-                    feed.feed.get('link', ''),
-                    feed.feed.get('summary', ''),
-                    episodes)
+        yield (links[0], entry.get('title', ''), entry.get('summary', ''),
+                parser.parse(entry.published))
+    raise StopIteration()
 
 
 def get_podcast(url):
@@ -68,4 +65,5 @@ def get_podcast(url):
 
     url - the url of the feed to be processed
     """
-    return _feed_to_obj(_parse_feed(url))
+    feed = _parse_feed(url)
+    return (_podcast_data(feed), _episode_iter(feed))

@@ -1,8 +1,20 @@
-#!/usr/bin/env python  #pylint: disable=missing-docstring
-from podcaster.main import Podcaster
+#!/usr/bin/env python
+from podcaster.operations import Controller
 
 import os
 
 
-os.environ.setdefault('VLC_PLUGIN_PATH', '/Applications/VLC.app/Contents/MacOS/plugins/')
-Podcaster().run()
+class Podcaster(object):
+    def __init__(self):
+        self.controller = Controller()
+
+    def run(self):
+        self.controller.update_podcasts()
+        current_menu = self.controller.all_podcasts
+        while current_menu is not None:
+            print
+            current_menu = current_menu()
+
+if __name__ == '__main__':
+    os.environ.setdefault('VLC_PLUGIN_PATH', '/Applications/VLC.app/Contents/MacOS/plugins/')
+    Podcaster().run()
