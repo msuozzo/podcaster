@@ -6,7 +6,7 @@ import os
 
 class Podcaster(object):
     def __init__(self):
-        self.controller = Controller()
+        self.controller = Controller('.podcaster.db')
 
     def run(self):
         self.controller.update_podcasts()

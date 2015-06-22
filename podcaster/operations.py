@@ -19,8 +19,11 @@ class SessionError(Exception):
 
 
 class Controller(object):
-    def __init__(self):
-        self._engine = create_engine('sqlite://', echo=False)
+    def __init__(self, db_fname=None):
+        db_path = 'sqlite://'
+        if db_fname is not None:
+            db_path = '/'.join((db_path, db_fname))
+        self._engine = create_engine(db_path, echo=False)
         BaseModel.metadata.create_all(self._engine)
         self._session = None
         self.view = ASCIIView(self)
@@ -56,10 +59,12 @@ class Controller(object):
 
     def downloaded_episodes(self, base=0):
         with self.session() as session:
-            local_episodes = session.query(Episode).filter(Episode.local_file.isnot(None)).order_by(Episode.local_file.date_created)
+            local_episodes = session.query(Episode)\
+                    .join(EpisodeFile)\
+                    .order_by(desc(EpisodeFile.date_created))
             total = local_episodes.count()
             episodes = local_episodes[base:base + 10]
-            range_ = (None if base == 0 else base, None if base + 10 >= total else base + 10)
+            range_ = (base, None if base + 10 >= total else base + 10)
             return self.view.downloaded_episodes(episodes, range_)
 
     def print_episodes(self, podcast_id):

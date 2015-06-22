@@ -74,7 +74,7 @@ class ASCIIView(object):
         # Build menu actions
         other_actions = {
                 'a': ('Add a new podcast URL', self.controller.add_podcast),
-                't': ('View Downloaded Episodes', self.downloaded_episodes),
+                't': ('View Downloaded Episodes', self.controller.downloaded_episodes),
                 'q': ('Quit', None)
             }
         action_rows = [(cmd, desc) for cmd, (desc, _) in other_actions.iteritems()]

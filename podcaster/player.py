@@ -1,6 +1,6 @@
 """Media players
 """
-from vlc import MediaPlayer, get_default_instance, PyFile_AsFile
+from podcaster.vlc import MediaPlayer, get_default_instance, PyFile_AsFile
 
 
 class Player(object):
