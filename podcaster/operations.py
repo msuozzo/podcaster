@@ -10,7 +10,6 @@ from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql.expression import desc
 
 
@@ -18,15 +17,23 @@ class SessionError(Exception):
     pass
 
 
+def _with_session(func):
+    def with_session(self, *args, **kwargs):
+        with self.session():
+            func(self, *args, **kwargs)
+    return with_session
+
+
 class Controller(object):
     def __init__(self, db_fname=None):
         db_path = 'sqlite://'
         if db_fname is not None:
             db_path = '/'.join((db_path, db_fname))
-        self._engine = create_engine(db_path, echo=False)
+        self._engine = create_engine(db_path, echo=True)
         BaseModel.metadata.create_all(self._engine)
         self._session = None
         self.view = ASCIIView(self)
+        self._store = SimplerFileStore('.podcasts')
 
     @contextmanager
     def session(self):
@@ -36,84 +43,52 @@ class Controller(object):
         if new_session:
             self._session = sessionmaker(bind=self._engine)()
         yield self._session
-        self._session.commit()
+        self._session.flush()
         if new_session:
+            self._session.commit()
             self._session = None
 
+    @staticmethod
+    def _paginate(query, limit, offset=0):
+        total = query.count()
+        last_ind = offset + limit
+        range_ = (offset, None if last_ind >= total else last_ind)
+        return (query.limit(limit).offset(offset), range_)
+
+    @_with_session
     def all_podcasts(self):
-        with self.session() as session:
-            podcasts = session.query(Podcast).order_by(Podcast.name)
-            return self.view.all_podcasts(podcasts)
+        podcasts = self._session.query(Podcast).order_by(Podcast.name)
+        return self.view.all_podcasts(podcasts)
 
+    @_with_session
     def episodes(self, podcast_id, base=0):
-        with self.session() as session:
-            podcast = session.query(Podcast).filter_by(id=podcast_id).scalar()
-            podcast.check()
-            episode_query = session.query(Episode)\
-                    .filter_by(podcast_id=podcast_id)\
-                    .order_by(desc(Episode.date_published))
-            total = episode_query.count()
-            episodes = episode_query[base:base + 10]
-            range_ = (base, None if base + 10 >= total else base + 10)
-            return self.view.episodes(podcast, episodes, range_)
+        podcast = self._session.query(Podcast).get(podcast_id)
+        podcast.check()
+        episode_query = self._session.query(Episode)\
+                            .filter_by(podcast_id=podcast_id)\
+                            .order_by(desc(Episode.date_published))
+        episodes, page_range = Controller._paginate(episode_query, 10, base)
+        return self.view.episodes(podcast, episodes, page_range)
 
+    @_with_session
     def downloaded_episodes(self, base=0):
-        with self.session() as session:
-            local_episodes = session.query(Episode)\
-                    .join(EpisodeFile)\
-                    .order_by(desc(EpisodeFile.date_created))
-            total = local_episodes.count()
-            episodes = local_episodes[base:base + 10]
-            range_ = (base, None if base + 10 >= total else base + 10)
-            return self.view.downloaded_episodes(episodes, range_)
+        episode_query = self._session.query(Episode)\
+                                    .join(EpisodeFile)\
+                                    .order_by(desc(EpisodeFile.date_created))
+        local_episodes, page_range = Controller._paginate(episode_query, 10, base)
+        return self.view.downloaded_episodes(local_episodes, page_range)
 
-    def print_episodes(self, podcast_id):
-        with self.session() as session:
-            podcast = session.query(Podcast).filter_by(id=podcast_id).scalar()
-            for episode in podcast.episodes:
-                print str(episode)
-
+    @_with_session
     def update_podcasts(self):
         self.view.update()
-        with self.session() as session:
-            rows = session.query(Podcast.id).all()
-            for row in rows:
-                self._update_podcast(row.id)
+        podcasts = self._session.query(Podcast).all()
+        for podcast in podcasts:
+            self.update_podcast(podcast.id)
 
-
-    def _update_podcast(self, podcast_id):
-        if self._session is None:
-            raise SessionError()
-        podcast = self._session.query(Podcast).filter_by(id=podcast_id).scalar()
-        podcast_tuple, episode_iter = get_podcast(podcast.rss_url)
-        if podcast_tuple is None:
-            raise Exception()
-        _, _, last_updated, _, _, _ = podcast_tuple
-        if last_updated is None:
-            return
-        if last_updated.replace(tzinfo=None) <= podcast.last_updated:
-            return
-        podcast.last_updated = last_updated.replace(tzinfo=None)
-        updated_ids = set([])
-        episode_query = self._session.query(Episode).filter_by(podcast_id=podcast.id)
-        for episode_tuple in episode_iter:
-            url, title, _, published = episode_tuple
-            try:
-                episode = episode_query.filter_by(title=title).scalar()
-            except NoResultFound:
-                episode = Episode(podcast_id=podcast.id, title=title, url=url,
-                                    date_published=published)
-                podcast.episodes.append(episode)
-            else:
-                episode.url = url
-                episode.date_published = published.replace(tzinfo=None)
-            self._session.flush()
-            updated_ids.add(episode.id)
-        absent_ids = episode_query.filter(~Episode.id.in_(updated_ids))
-        for row in absent_ids:
-            episode = episode_query.filter_by(id=row.id).scalar()
-            self._session.delete(episode)
-
+    @_with_session
+    def update_podcast(self, podcast_id):
+        #TODO
+        return
 
     def get_podcast_name(self, podcast_url):
         podcast_tuple, _ = get_podcast(podcast_url)
@@ -125,80 +100,70 @@ class Controller(object):
     def add_podcast(self):
         return self.view.add_podcast()
 
+    @_with_session
     def new_podcast(self, podcast_url):
-        with self.session() as session:
-            podcast_tuple, episode_iter = get_podcast(podcast_url)
-            if podcast_tuple is None:
-                return None
-            title, rss_url, last_updated, _, _, _ = podcast_tuple
-            podcast = Podcast(name=title, rss_url=rss_url, last_updated=last_updated)
-            session.add(podcast)
-            session.flush()
-            for episode_tuple in reversed(list(episode_iter)):
-                url, title, _, published = episode_tuple
-                episode = Episode(podcast_id=podcast.id, title=title, url=url, date_published=published)
-                podcast.episodes.append(episode)
+        podcast_tuple, episode_iter = get_podcast(podcast_url)
+        if podcast_tuple is None:
+            return None
+        title, rss_url, last_updated, _, _, _ = podcast_tuple
+        podcast = Podcast(name=title, rss_url=rss_url, last_updated=last_updated)
+        self._session.add(podcast)
+        self._session.flush()
+        for episode_tuple in reversed(list(episode_iter)):
+            url, title, _, published = episode_tuple
+            episode = Episode(podcast_id=podcast.id, title=title, url=url, date_published=published)
+            podcast.episodes.append(episode)
 
+    @_with_session
     def play(self, episode_id, cb_return_menu):
-        with self.session() as session:
-            episode = session.query(Episode).filter_by(id=episode_id).scalar()
-            podcast = session.query(Podcast).filter_by(id=episode.podcast_id).scalar()
-            if not episode.is_downloaded():
-                if not self.view.download(episode):
-                    return cb_return_menu
-            return self.view.play(podcast, episode, cb_return_menu)
+        episode = self._session.query(Episode).get(episode_id)
+        podcast = self._session.query(Podcast).get(episode.podcast_id)
+        if not episode.is_downloaded() and not self.view.download(episode):
+            return cb_return_menu
+        return self.view.play(podcast, episode, cb_return_menu)
 
-
+    @_with_session
     def download_file(self, episode_id, cb_progress=None):
-        #import pdb; pdb.set_trace()
-        store = SimplerFileStore('.podcasts')
-        with self.session() as session:
-            episode = session.query(Episode).filter_by(id=episode_id).scalar()
-            key = self._episode_key(episode_id, episode)
-            # Define callback closure to convert download callback format to progress format
-            if cb_progress is not None:
-                def cb_report(chunk_num, chunk_size, total_size):
-                    """Return the completion ratio of the download if available.
-                    Else, return None
-                    """
-                    if total_size != -1:
-                        cb_progress((1. * chunk_size * chunk_num) / total_size)
-                    else:
-                        cb_progress(None)
-            else:
-                cb_report = None
-            # Attempt download
-            try:
-                local_fname, _ = download_to_file(episode.url, reporthook=cb_report)
-            except ConnectionError:
-                return False
-            else:
-                with open(local_fname, 'rb') as file_:
-                    store.put(key, file_)
-                uri = 'file://' + store.get_path(key)
-                episode_file = EpisodeFile(episode_id=episode_id, uri=uri)
-                episode.local_file = episode_file
-        return True
+        episode = self._session.query(Episode).get(episode_id)
+        key = self._episode_key(episode_id)
+        # Define callback closure to convert download callback format to progress format
+        if cb_progress is not None:
+            def cb_report(chunk_num, chunk_size, total_size):
+                """Return the completion ratio of the download if available.
+                Else, return None
+                """
+                if total_size != -1:
+                    cb_progress((1. * chunk_size * chunk_num) / total_size)
+                else:
+                    cb_progress(None)
+        else:
+            cb_report = None
+        # Attempt download
+        try:
+            local_fname, _ = download_to_file(episode.url, reporthook=cb_report)
+        except ConnectionError:
+            return False
+        else:
+            with open(local_fname, 'rb') as file_:
+                self._store.put(key, file_)
+            uri = 'file://' + self._store.get_path(key)
+            episode.local_file = EpisodeFile(episode_id=episode_id, uri=uri)
+            return True
 
+    @_with_session
     def delete_file(self, episode_id):
-        store = SimplerFileStore('.podcasts')
-        with self.session() as session:
-            episode = session.query(Episode).filter_by(id=episode_id).scalar()
-            key = self._episode_key(episode_id, episode)
-            store.remove(key)
-            session.delete(episode.local_file)
+        episode = self._session.query(Episode).get(episode_id)
+        key = self._episode_key(episode_id)
+        self._store.remove(key)
+        self._session.delete(episode.local_file)
 
     def update_episode_state(self, episode_id, position, playback_rate):
-        episode = self._session.query(Episode).filter_by(id=episode_id).scalar()
-        podcast = self._session.query(Podcast).filter_by(id=episode.podcast_id).scalar()
+        episode = self._session.query(Episode).get(episode_id)
+        podcast = self._session.query(Podcast).get(episode.podcast_id)
         episode.last_position = position
         podcast.playback_rate = playback_rate
 
-    def _episode_key(self, episode_id, episode=None, podcast=None):
-        if self._session is None:
-            raise SessionError()
-        if episode is None:
-            episode = self._session.query(Episode).filter_by(id=episode_id).scalar()
-        if podcast is None:
-            podcast = self._session.query(Podcast).filter_by(id=episode.podcast_id).scalar()
-        return podcast.name + ' - ' + episode.title
+    def _episode_key(self, episode_id):
+        episode = self._session.query(Episode).get(episode_id)
+        podcast = self._session.query(Podcast).get(episode.podcast_id)
+        return ' - '.join((podcast.name, episode.title))

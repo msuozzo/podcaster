@@ -25,7 +25,7 @@ class Podcast(BaseModel):
     last_checked = Column(DateTime(timezone=True))
     last_updated = Column(DateTime(timezone=True))
     playback_rate = Column(Integer)
-    episodes = relationship('Episode', order_by='Episode.id', cascade='all, delete, delete-orphan')
+    episodes = relationship('Episode', order_by='Episode.date_published', cascade='all, delete, delete-orphan')
 
     def __init__(self, **kwargs):
         if 'last_updated' not in kwargs or kwargs['last_updated'] is None:
