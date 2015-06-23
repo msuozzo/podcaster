@@ -72,8 +72,10 @@ class ASCIIView(object):
         to_key = lambda i: str(i + 1)
         data_rows = build_data_rows(to_key, podcasts, new_series, name_series)
         # Build menu actions
+        cb_return_menu = self.controller.all_podcasts
         other_actions = {
                 'a': ('Add a new podcast URL', self.controller.add_podcast),
+                'u': ('Update All Podcasts', lambda: self.controller.update_podcasts(cb_return_menu)),
                 't': ('View Downloaded Episodes', self.controller.downloaded_episodes),
                 'q': ('Quit', None)
             }
@@ -104,8 +106,11 @@ class ASCIIView(object):
         to_key = lambda i: str(i + 1)
         data_rows = build_data_rows(to_key, episodes, date_series, dld_series, title_series)
         # Build menu actions
+        cb_return_menu = lambda p=podcast.id: self.controller.episodes(p, episode_range[0])
         other_actions = {
                 'b': ('Back to All Podcasts', self.controller.all_podcasts),
+                'u': ('Update', lambda: self.controller.update_podcast(podcast.id, cb_return_menu)),
+                'd{n}': ('Delete an Episode', lambda: None),
                 'q': ('Quit', None)
             }
         if episode_range[1] is not None:
@@ -117,11 +122,11 @@ class ASCIIView(object):
         page_text = build_menu(podcast.name + ' Episodes', data_rows, action_rows)
 
         actions = {}
-        pid = podcast.id
-        cb_return_menu = lambda p=pid: self.controller.episodes(p, episode_range[0])
         for ind, episode in enumerate(episodes):
             eid = episode.id
             actions[to_key(ind)] = lambda e=eid: self.controller.play(e, cb_return_menu)
+            actions['d' + to_key(ind)] = lambda e=eid: self.controller.delete_episode(e, cb_return_menu)
+        del other_actions['d{n}']
         for cmd, (_, action) in other_actions.iteritems():
             actions[cmd] = action
 
@@ -143,6 +148,7 @@ class ASCIIView(object):
         # Build menu actions
         other_actions = {
                 'b': ('Back to All Podcasts', self.controller.all_podcasts),
+                'd{n}': ('Delete an Episode', lambda: None),
                 'q': ('Quit', None)
             }
 
@@ -155,6 +161,8 @@ class ASCIIView(object):
         for ind, episode in enumerate(episodes):
             eid = episode.id
             actions[to_key(ind)] = lambda e=eid: self.controller.play(e, cb_return_menu)
+            actions['d' + to_key(ind)] = lambda e=eid: self.controller.delete_episode(e, cb_return_menu)
+        del other_actions['d{n}']
         for cmd, (_, action) in other_actions.iteritems():
             actions[cmd] = action
 
@@ -176,7 +184,7 @@ class ASCIIView(object):
                 self._interactive.write('%d%% ' % (100 * ratio))
                 self._interactive.flush()
                 current_progress[0] += progress_step
-        success = self.controller.download_file(episode.id, cb_progress)
+        success = self.controller.download_episode(episode.id, cb_progress)
         if not success:
             self._interactive.print_('\nDownload failed')
         else:

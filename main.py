@@ -9,7 +9,7 @@ class Podcaster(object):
         self.controller = Controller('.podcaster.db')
 
     def run(self):
-        self.controller.update_podcasts()
+        self.controller.update_podcasts(lambda: None)
         current_menu = self.controller.all_podcasts
         while current_menu is not None:
             print

@@ -79,15 +79,20 @@ class Controller(object):
         return self.view.downloaded_episodes(local_episodes, page_range)
 
     @_with_session
-    def update_podcasts(self):
+    def update_podcasts(self, cb_return_menu):
         self.view.update()
         podcasts = self._session.query(Podcast).all()
         for podcast in podcasts:
-            self.update_podcast(podcast.id)
+            self._update_podcast(podcast)
+        return cb_return_menu
 
     @_with_session
-    def update_podcast(self, podcast_id):
+    def update_podcast(self, podcast_id, cb_return_menu):
         podcast = self._session.query(Podcast).get(podcast_id)
+        self._update_podcast(podcast)
+        return cb_return_menu
+
+    def _update_podcast(self, podcast):
         podcast_tuple, episode_iter = get_podcast(podcast.rss_url)
         if podcast_tuple is None:
             raise Exception()
@@ -106,6 +111,7 @@ class Controller(object):
                 episode = Episode(podcast_id=podcast.id, title=title, url=url,
                                         date_published=published)
                 podcast.episodes.append(episode)
+                # ensure episode is added to the db so it is assigned an ID
                 self._session.flush()
             updated_ids.add(episode.id)
         absent_ids = episode_query.filter(~Episode.id.in_(updated_ids))
@@ -145,7 +151,7 @@ class Controller(object):
         return self.view.play(podcast, episode, cb_return_menu)
 
     @_with_session
-    def download_file(self, episode_id, cb_progress=None):
+    def download_episode(self, episode_id, cb_progress=None):
         episode = self._session.query(Episode).get(episode_id)
         key = self._episode_key(episode_id)
         # Define callback closure to convert download callback format to progress format
@@ -173,11 +179,12 @@ class Controller(object):
             return True
 
     @_with_session
-    def delete_file(self, episode_id):
+    def delete_episode(self, episode_id, cb_return_menu):
         episode = self._session.query(Episode).get(episode_id)
         key = self._episode_key(episode_id)
         self._store.remove(key)
         self._session.delete(episode.local_file)
+        return cb_return_menu
 
     def update_episode_state(self, episode_id, position, playback_rate):
         episode = self._session.query(Episode).get(episode_id)
