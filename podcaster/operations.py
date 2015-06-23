@@ -20,7 +20,7 @@ class SessionError(Exception):
 def _with_session(func):
     def with_session(self, *args, **kwargs):
         with self.session():
-            func(self, *args, **kwargs)
+            return func(self, *args, **kwargs)
     return with_session
 
 
@@ -29,7 +29,7 @@ class Controller(object):
         db_path = 'sqlite://'
         if db_fname is not None:
             db_path = '/'.join((db_path, db_fname))
-        self._engine = create_engine(db_path, echo=True)
+        self._engine = create_engine(db_path, echo=False)
         BaseModel.metadata.create_all(self._engine)
         self._session = None
         self.view = ASCIIView(self)
@@ -87,8 +87,30 @@ class Controller(object):
 
     @_with_session
     def update_podcast(self, podcast_id):
-        #TODO
-        return
+        podcast = self._session.query(Podcast).get(podcast_id)
+        podcast_tuple, episode_iter = get_podcast(podcast.rss_url)
+        if podcast_tuple is None:
+            raise Exception()
+        _, _, last_updated, _, _, _ = podcast_tuple
+        if last_updated is None or \
+                last_updated.replace(tzinfo=None) <= podcast.last_updated:
+            return
+        podcast.last_updated = last_updated.replace(tzinfo=None)
+        updated_ids = set([])
+        episode_query = self._session.query(Episode).filter_by(podcast_id=podcast.id)
+        for episode_tuple in episode_iter:
+            url, title, _, published = episode_tuple
+            episode = episode_query.filter_by(title=title, url=url,
+                                                    date_published=published).scalar()
+            if episode is None:
+                episode = Episode(podcast_id=podcast.id, title=title, url=url,
+                                        date_published=published)
+                podcast.episodes.append(episode)
+                self._session.flush()
+            updated_ids.add(episode.id)
+        absent_ids = episode_query.filter(~Episode.id.in_(updated_ids))
+        for episode in absent_ids:
+            self._session.delete(episode)
 
     def get_podcast_name(self, podcast_url):
         podcast_tuple, _ = get_podcast(podcast_url)
