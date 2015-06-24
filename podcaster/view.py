@@ -1,31 +1,18 @@
 from podcaster.player import VLCPlayer
 from podcaster.controller import CmdLineController
 from podcaster.menu import build_data_rows, build_menu
+from podcaster.io import CmdLineIO
 
 from operator import attrgetter
-import sys
-
-
-class CmdLine():
-    def __init__(self):
-        self.out = sys.stdout
-        self.write = self.out.write
-        self.prompt = raw_input
-        self.flush = self.out.flush
-
-    def print_(self, *args):
-        self.write(' '.join(map(str, args)))
-        self.write('\n')
 
 
 class ASCIIView(object):
-
-    def __init__(self, controller, interactive_cls=CmdLine):
+    def __init__(self, controller, io_cls=CmdLineIO):
         self.controller = controller
-        self._interactive = interactive_cls()
+        self._io = io_cls()
 
     def _menu_action(self, page_text, actions):
-        self._interactive.print_(page_text)
+        self._io.print_(page_text)
         choice = self._get_valid_choice(actions.keys())
         return actions[choice]
 
@@ -34,29 +21,28 @@ class ASCIIView(object):
         while True:
             choice = raw_input('> ')
             if choice not in valid_choices:
-                self._interactive.print_(fail_str)
+                self._io.print_(fail_str)
             else:
                 return choice
 
     def update(self):
-        self._interactive.print_('Updating...')
+        self._io.print_('Updating...')
 
     def add_podcast(self):
-        prompt = self._interactive.prompt
         while True:
-            url = prompt('Enter Podcast URL (empty to cancel): ')
+            url = self._io.input_('Enter Podcast URL (empty to cancel): ')
             if not url:
                 break
-            self._interactive.print_('Retrieving feed information')
+            self._io.print_('Retrieving feed information')
             new_podcast = self.controller.get_podcast_name(url)
             if new_podcast is None:
-                self._interactive.print_('Failed to extract a Podcast RSS feed from URL')
-            elif prompt('Add "%s" (y/N)? ' % new_podcast) == 'y':
+                self._io.print_('Failed to extract a Podcast RSS feed from URL')
+            elif self._io.input_('Add "%s" (y/N)? ' % new_podcast) == 'y':
                 self.controller.new_podcast(url)
-                self._interactive.print_('Successfully added "%s"' % new_podcast)
+                self._io.print_('Successfully added "%s"' % new_podcast)
                 break
             else:
-                self._interactive.print_('Not adding "%s"' % new_podcast)
+                self._io.print_('Not adding "%s"' % new_podcast)
         return self.controller.all_podcasts
 
 
@@ -169,7 +155,7 @@ class ASCIIView(object):
         return self._menu_action(page_text, actions)
 
     def download(self, episode):
-        self._interactive.print_('Downloading %s....' % episode.title)
+        self._io.print_('Downloading %s....' % episode.title)
         # Create a closure around mutable `current_progress`
         current_progress = [.0]
         progress_step = .1
@@ -181,14 +167,14 @@ class ASCIIView(object):
             at set increments.
             """
             if ratio is not None and current_progress[0] < ratio:
-                self._interactive.write('%d%% ' % (100 * ratio))
-                self._interactive.flush()
+                self._io.write('%d%% ' % (100 * ratio))
+                self._io.flush()
                 current_progress[0] += progress_step
         success = self.controller.download_episode(episode.id, cb_progress)
         if not success:
-            self._interactive.print_('\nDownload failed')
+            self._io.print_('\nDownload failed')
         else:
-            self._interactive.print_('\nDownload complete!\n')
+            self._io.print_('\nDownload complete!\n')
         return success
 
     def play(self, podcast, episode, cb_return_menu):

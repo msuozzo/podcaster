@@ -1,54 +1,8 @@
 """Controllers for `Player` objects
 """
-import signal
+from podcaster.io import AsyncCmdLineIO
+
 from itertools import chain
-
-
-class TimeoutError(BaseException):
-    """Indicates a timeout
-    """
-    pass
-
-
-class TimeoutInput(object):
-    """An terminal input utility that expires after a fixed number of seconds
-    """
-    def __init__(self, prompt='> ', timeout=1):
-        self.timeout = timeout
-        self.prompt = prompt
-        # register interrupt handler
-        def cb_interrupt(signum, frame):
-            """Raise a TimeoutError if SIGALRM is encountered
-            """
-            if signum == signal.SIGALRM:
-                raise TimeoutError()
-        signal.signal(signal.SIGALRM, cb_interrupt)
-
-    def get_input(self, print_prompt=True):
-        """Prompt the user for input.
-
-        print_prompt - print the prompt string (`self.prompt`).
-        """
-        return raw_input(self.prompt if print_prompt else '')
-
-    def get_async_input(self, print_prompt=True):
-        """Prompt the user for input.
-        If the user responds within `self.timeout` seconds, return the user's input.
-        Else, return None.
-
-        print_prompt - print the prompt string (`self.prompt`).
-                        If operation timed out previously, prompt should be
-                        False so the prompt string will not be printed twice.
-        """
-        signal.alarm(self.timeout)
-        try:
-            input_ = self.get_input(print_prompt)
-        except TimeoutError:
-            return None
-        else:
-            # disable alarm
-            signal.alarm(0)
-            return input_
 
 
 class CmdLineController(object):
@@ -75,7 +29,7 @@ class CmdLineController(object):
             }
         self._interrupted = False
         self._finished = False
-        self._input_getter = TimeoutInput()
+        self._input_getter = AsyncCmdLineIO(timeout=5)
 
     def run(self, initial_rate=None, initial_position=None):
         """Run the command loop
@@ -83,10 +37,7 @@ class CmdLineController(object):
         initial_rate = 1.0 if initial_rate is None else initial_rate
         if initial_position is not None:
             print 'Skip to %d seconds in (y/N)' % initial_position
-            old = self._input_getter.prompt
-            self._input_getter.prompt = '? '
-            cmd = self._input_getter.get_input()
-            self._input_getter.prompt = old
+            cmd = self._input_getter.input_('? ')
             use_initial_position = cmd == 'y'
         else:
             use_initial_position = False
@@ -104,7 +55,7 @@ class CmdLineController(object):
         self._print_help()
 
         while True:
-            cmd = self._input_getter.get_async_input(print_prompt=not self._interrupted)
+            cmd = self._input_getter.async_input('> ' if not self._interrupted else '')
             self._update_callback(self._player)
             # If playback finishes, end the player regardless of the user command
             if self._player.is_finished() or cmd == 'q':
