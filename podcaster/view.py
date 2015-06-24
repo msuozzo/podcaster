@@ -100,7 +100,8 @@ class ASCIIView(object):
                 'q': ('Quit', None)
             }
         if episode_range[1] is not None:
-            other_actions['n'] = ('Next Page', lambda: self.controller.episodes(podcast.id, episode_range[1]))
+            other_actions['n'] = ('Next Page',
+                                    lambda: self.controller.episodes(podcast.id, episode_range[1]))
         if episode_range[0] != 0:
             other_actions['p'] = ('Previous Page', lambda: self.controller.episodes(podcast.id, episode_range[0] - 10))
         action_rows = [(cmd, desc) for cmd, (desc, _) in other_actions.iteritems()]
@@ -189,7 +190,8 @@ class ASCIIView(object):
     def play(self, podcast, episode, cb_return_menu):
         """Launch the Player to play `episode`
         """
-        with VLCPlayer.init_no_log(episode.local_file.uri) as player:
+        with VLCPlayer.init_no_log() as player:
+            player.change_media(episode.title, episode.local_file.uri)
             def cb_update_position(player):
                 """Update the playback position periodically.
                 """

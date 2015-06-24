@@ -8,55 +8,61 @@ from contextlib import contextmanager
 class Player(object):
     """An abstract class providing a media player interface.
     """
-    def __init__(self, uri=''):
-        pass
-
-    def change_media(self, uri):
+    def change_media(self, name, uri):
         """Change the media being played
+
+        Args:
+            name: Name of the media being loaded
+            uri: URI of the media being loaded
         """
-        raise NotImplementedError()
+        raise NotImplementedError
+
+    def get_media_name(self):
+        """Return the name of the currently loaded media
+        """
+        raise NotImplementedError
 
     def get_media_length(self):
         """Return the length of the media in seconds
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def play(self):
         """Play the media
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def pause(self):
         """Pause the media
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def stop(self):
         """Stop media playback
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def is_playing(self):
         """Return whether the media is playing
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def is_finished(self):
         """Return whether the media has concluded
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def set_playback_rate(self, new_rate):
         """Set the playback rate of the media
 
         new_rate - the new playback rate (1.0 is normal speed)
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get_playback_rate(self):
         """Get the current playback rate
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def move_playback_rate(self, rate_offset):
         """Move the playback position of the media
@@ -74,13 +80,13 @@ class Player(object):
         seconds - the second offset from the start of the media from which to
                     play
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get_position(self):
         """Get the current playback position as a second offset from the start
         of the media
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def move_position(self, position_offset):
         """Move the playback position of the media
@@ -93,11 +99,10 @@ class Player(object):
 class VLCPlayer(Player):
     """A Player backed by libvlc's MediaPlayer
     """
-    def __init__(self, uri=''):
-        super(VLCPlayer, self).__init__(uri)
+    def __init__(self):
+        super(VLCPlayer, self).__init__()
         self._player = MediaPlayer()
-        if uri:
-            self.change_media(uri)
+        self._media_name = ''
 
     @staticmethod
     @contextmanager
@@ -110,9 +115,13 @@ class VLCPlayer(Player):
             get_default_instance().log_set_file(PyFile_AsFile(sink))
             yield VLCPlayer(*args, **kwargs)
 
-    def change_media(self, uri):
+    def change_media(self, name, uri):
         media = get_default_instance().media_new(uri)
         self._player.set_media(media)
+        self._media_name = name
+
+    def get_media_name(self):
+        return self._media_name
 
     def get_media_length(self):
         return self._player.get_length() / 1000
