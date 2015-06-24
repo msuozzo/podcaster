@@ -2,6 +2,8 @@
 """
 from podcaster.vlc import MediaPlayer, get_default_instance, PyFile_AsFile
 
+from contextlib import contextmanager
+
 
 class Player(object):
     """An abstract class providing a media player interface.
@@ -93,13 +95,20 @@ class VLCPlayer(Player):
     """
     def __init__(self, uri=''):
         super(VLCPlayer, self).__init__(uri)
-        #FIXME: Leaks file opener
-        # Kill the log output for libvlc
-        sink = open('/dev/null', 'w')
-        get_default_instance().log_set_file(PyFile_AsFile(sink))
         self._player = MediaPlayer()
         if uri:
             self.change_media(uri)
+
+    @staticmethod
+    @contextmanager
+    def init_no_log(*args, **kwargs):
+        """Context for an instance of VLCPlayer which emits no log messages.
+
+        Args: VLCPlayer constructor arguments
+        """
+        with open('/dev/null', 'w') as sink:
+            get_default_instance().log_set_file(PyFile_AsFile(sink))
+            yield VLCPlayer(*args, **kwargs)
 
     def change_media(self, uri):
         media = get_default_instance().media_new(uri)

@@ -189,15 +189,15 @@ class ASCIIView(object):
     def play(self, podcast, episode, cb_return_menu):
         """Launch the Player to play `episode`
         """
-        player = VLCPlayer(episode.local_file.uri)
-        def cb_update_position(player):
-            """Update the playback position periodically.
-            """
-            self.controller.update_episode_state(episode.id,
-                    player.get_position(),
-                    player.get_playback_rate())
-        controller = CmdLineController(player, cb_update_position)
-        controller.run(initial_rate=podcast.playback_rate,
-                        initial_position=episode.last_position)
+        with VLCPlayer.init_no_log(episode.local_file.uri) as player:
+            def cb_update_position(player):
+                """Update the playback position periodically.
+                """
+                self.controller.update_episode_state(episode.id,
+                        player.get_position(),
+                        player.get_playback_rate())
+            controller = CmdLineController(player, cb_update_position)
+            controller.run(initial_rate=podcast.playback_rate,
+                            initial_position=episode.last_position)
 
         return cb_return_menu
