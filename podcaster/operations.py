@@ -71,12 +71,14 @@ class Controller(object):
         return self.view.episodes(podcast, episodes, page_range)
 
     @_with_session
-    def downloaded_episodes(self, base=0):
-        episode_query = self._session.query(Episode)\
+    def downloaded_episodes(self):
+        episode_query = self._session.query(Episode, Podcast)\
+                                    .filter(Episode.podcast_id == Podcast.id)\
                                     .join(EpisodeFile)\
                                     .order_by(desc(EpisodeFile.date_created))
-        local_episodes, page_range = Controller._paginate(episode_query, 10, base)
-        return self.view.downloaded_episodes(local_episodes, page_range)
+        episodes = [episode for episode, _ in episode_query.all()]
+        podcasts = [podcast for _, podcast in episode_query.all()]
+        return self.view.downloaded_episodes(episodes, podcasts)
 
     @_with_session
     def update_podcasts(self, cb_return_menu):

@@ -118,7 +118,13 @@ class ASCIIView(object):
 
         return self._menu_action(page_text, actions)
 
-    def downloaded_episodes(self, episodes, episode_range):
+    def downloaded_episodes(self, episodes, podcasts):
+        """Menu containing all episodes that are currently downloaded
+
+        Args:
+            episodes: the list of Episode objects that currently reside on the file system
+            podcasts: a list of Podcast objects corresponding by index to each Episode in `episodes`
+        """
         # extract the 10 episodes prior to `base`
         date_series = ("Date",
                         lambda e: e.local_file.date_created,
@@ -126,6 +132,9 @@ class ASCIIView(object):
         title_series = ("Episode",
                         attrgetter('title'),
                         lambda f: f)
+        # Add podcast name to episode objects
+        for episode, podcast in zip(episodes, podcasts):
+            episode.podcast_name = podcast.name
         podcast_series = ("Podcast",
                         attrgetter('podcast_name'),
                         lambda f: f)
