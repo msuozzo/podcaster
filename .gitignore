@@ -1,3 +1,12 @@
+# Python
 *.py[cdo]
-.podcasts
+
+# SQLAlchemy
 .podcaster.db
+
+# Coverage
+htmlcov
+.coverage
+
+# Podcaster
+.podcasts
