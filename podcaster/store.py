@@ -88,7 +88,7 @@ class SimpleFileStore(SimplerFileStore):
     _MANIFEST_FNAME = '.manifest.json'
 
     def __init__(self, store_dir):
-        super(SimpleFileStore, self).__init__(self, store_dir)
+        super(SimpleFileStore, self).__init__(store_dir)
         self._manifest_fname = SimpleFileStore._MANIFEST_FNAME
         self._manifest_path = os.path.join(self._store_dir, self._manifest_fname)
         self._manifest = {}
@@ -143,7 +143,7 @@ class SimpleFileStore(SimplerFileStore):
         key - the string to be mapped to `data`
         data - the data to be associated with `key`
         """
-        super(SimpleFileStore, self).put(self, key, data)
+        super(SimpleFileStore, self).put(key, data)
         self._manifest[key] = {'added': datetime.now(tzutc()), 'path': self._key_to_path(key)}
 
     def get_path(self, key):
@@ -169,7 +169,7 @@ class SimpleFileStore(SimplerFileStore):
         key - the key to be removed from the store
         """
         if self.exists(key):
-            super(SimpleFileStore, self).remove(self, key)
+            super(SimpleFileStore, self).remove(key)
             del self._manifest[key]
 
     def exists(self, key):
