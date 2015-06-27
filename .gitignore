@@ -2,7 +2,8 @@
 *.py[cdo]
 
 # SQLAlchemy
-.podcaster.db
+*.db
+*.db-journal
 
 # Coverage
 htmlcov

@@ -45,7 +45,6 @@ class ASCIIView(object):
                 self._io.print_('Not adding "%s"' % new_podcast)
         return self.controller.all_podcasts
 
-
     def all_podcasts(self, podcasts):
         # Build menu data
         new_series = ('New?',
@@ -61,14 +60,14 @@ class ASCIIView(object):
         cb_return_menu = self.controller.all_podcasts
         other_actions = {
                 'a': ('Add a new podcast URL', self.controller.add_podcast),
-                'u': ('Update All Podcasts', lambda: self.controller.update_podcasts(cb_return_menu)),
+                'u': ('Update All Podcasts',
+                        lambda: self.controller.update_podcasts(cb_return_menu)),
                 't': ('View Downloaded Episodes', self.controller.downloaded_episodes),
                 'q': ('Quit', None)
             }
         action_rows = [(cmd, desc) for cmd, (desc, _) in other_actions.iteritems()]
         # Build menu page
         page_text = build_menu('All Podcasts', data_rows, action_rows)
-
         # Build action table
         actions = {}
         for ind, podcast in enumerate(podcasts):
@@ -99,20 +98,22 @@ class ASCIIView(object):
                 'd{n}': ('Delete an Episode', lambda: None),
                 'q': ('Quit', None)
             }
+        next_func = lambda: self.controller.episodes(podcast.id, episode_range[1])
+        prev_func = lambda: self.controller.episodes(podcast.id, episode_range[0] - 10)
         if episode_range[1] is not None:
-            other_actions['n'] = ('Next Page',
-                                    lambda: self.controller.episodes(podcast.id, episode_range[1]))
+            other_actions['n'] = ('Next Page', next_func)
         if episode_range[0] != 0:
-            other_actions['p'] = ('Previous Page', lambda: self.controller.episodes(podcast.id, episode_range[0] - 10))
+            other_actions['p'] = ('Previous Page', prev_func)
         action_rows = [(cmd, desc) for cmd, (desc, _) in other_actions.iteritems()]
         # Build menu page
-        page_text = build_menu(podcast.name + ' Episodes', data_rows, action_rows)
+        page_text = build_menu('`%s` Episodes' % podcast.name, data_rows, action_rows)
 
         actions = {}
         for ind, episode in enumerate(episodes):
             eid = episode.id
             actions[to_key(ind)] = lambda e=eid: self.controller.play(e, cb_return_menu)
-            actions['d' + to_key(ind)] = lambda e=eid: self.controller.delete_episode(e, cb_return_menu)
+            actions['d' + to_key(ind)] = lambda e=eid:\
+                                                self.controller.delete_episode(e, cb_return_menu)
         del other_actions['d{n}']
         for cmd, (_, action) in other_actions.iteritems():
             actions[cmd] = action
@@ -129,7 +130,7 @@ class ASCIIView(object):
         # extract the 10 episodes prior to `base`
         date_series = ("Date",
                         lambda e: e.local_file.date_created,
-                        lambda field: field.strftime('%m/%d'))
+                        lambda date: date.strftime('%m/%d'))
         title_series = ("Episode",
                         attrgetter('title'),
                         lambda f: f)
@@ -147,7 +148,6 @@ class ASCIIView(object):
                 'd{n}': ('Delete an Episode', lambda: None),
                 'q': ('Quit', None)
             }
-
         action_rows = [(cmd, desc) for cmd, (desc, _) in other_actions.iteritems()]
         # Build menu page
         page_text = build_menu('Downloaded Episodes', data_rows, action_rows)
@@ -157,7 +157,8 @@ class ASCIIView(object):
         for ind, episode in enumerate(episodes):
             eid = episode.id
             actions[to_key(ind)] = lambda e=eid: self.controller.play(e, cb_return_menu)
-            actions['d' + to_key(ind)] = lambda e=eid: self.controller.delete_episode(e, cb_return_menu)
+            actions['d' + to_key(ind)] = lambda e=eid:\
+                                                self.controller.delete_episode(e, cb_return_menu)
         del other_actions['d{n}']
         for cmd, (_, action) in other_actions.iteritems():
             actions[cmd] = action

@@ -193,6 +193,7 @@ class Controller(object):
         podcast = self._session.query(Podcast).get(episode.podcast_id)
         episode.last_position = position
         podcast.playback_rate = playback_rate
+        self._session.flush()
 
     def _episode_key(self, episode_id):
         episode = self._session.query(Episode).get(episode_id)
