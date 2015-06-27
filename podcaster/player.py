@@ -1,8 +1,16 @@
 """Media players
 """
-from podcaster.vlc import MediaPlayer, get_default_instance, PyFile_AsFile
+from podcaster.vlc import MediaPlayer, get_default_instance, PyFile_AsFile, EventType, State
 
 from contextlib import contextmanager
+from os import devnull
+from copy import copy
+
+
+class MediaError(Exception):
+    """Indicates an error with the media loaded into the player.
+    """
+    pass
 
 
 class Player(object):
@@ -98,11 +106,17 @@ class Player(object):
 
 class VLCPlayer(Player):
     """A Player backed by libvlc's MediaPlayer
+
+    Because of the imprecision of the C-to-Python floating-point
+    value conversions, this class limits the precision of the
+    playback rate and position (seconds elapsed) to 4 decimal places.
     """
     def __init__(self):
         super(VLCPlayer, self).__init__()
         self._player = MediaPlayer()
         self._media_name = ''
+        self._vlc_event = self._player.event_manager()
+        self._last_event = None
 
     @staticmethod
     @contextmanager
@@ -111,22 +125,65 @@ class VLCPlayer(Player):
 
         Args: VLCPlayer constructor arguments
         """
-        with open('/dev/null', 'w') as sink:
+        with open(devnull, 'w') as sink:
             get_default_instance().log_set_file(PyFile_AsFile(sink))
             yield VLCPlayer(*args, **kwargs)
+
+    @contextmanager
+    def _set_event_handler(self, event_type):
+        """Sets an event handler for a vlc.EventType value
+
+        `self._last_event` will be set with any matching events that occur in
+        the scope of the context.
+
+        event_type: a vlc.EventType value
+        """
+        def cb_event_handler(event):
+            """Set the object's last event to the type of `event`
+            """
+            # Memory becomes invalid without a copy here (causes segfault)
+            self._last_event = copy(event.type)
+
+        self._vlc_event.event_attach(event_type, cb_event_handler)
+        yield
+        self._vlc_event.event_detach(event_type)
+        self._last_event = None
 
     def change_media(self, name, uri):
         media = get_default_instance().media_new(uri)
         self._player.set_media(media)
         self._media_name = name
+        with self._set_event_handler(EventType.MediaPlayerEncounteredError):
+            with self._set_event_handler(EventType.MediaPlayerPausableChanged):
+                self.play_async()
+                while self._last_event is None:
+                    pass
+                if self._last_event == EventType.MediaPlayerEncounteredError:
+                    raise MediaError('Failed to load media "%s" from "%s"' % (name, uri))
+                self.stop()
 
     def get_media_name(self):
         return self._media_name
 
+    @staticmethod
+    def _round(val):
+        """Round floating point values to 4 decimal places
+        """
+        return round(val, 4)
+
     def get_media_length(self):
-        return self._player.get_length() / 1000
+        return VLCPlayer._round(self._player.get_length() / 1000.)
 
     def play(self):
+        with self._set_event_handler(EventType.MediaPlayerPlaying):
+            self.play_async()
+            while self._last_event is None:
+                pass
+
+    def play_async(self):
+        """Return immediately after issuing the play command.
+        NOTE: media may not be playing upon return
+        """
         self._player.play()
 
     def pause(self):
@@ -139,18 +196,18 @@ class VLCPlayer(Player):
         return self._player.is_playing()
 
     def is_finished(self):
-        return self.get_position() == self.get_media_length()
+        return self._player.get_state() == State.Ended
 
     def set_playback_rate(self, new_rate):
         if new_rate > 0. and new_rate <= 10.:
             self._player.set_rate(new_rate)
 
     def get_playback_rate(self):
-        return self._player.get_rate()
+        return VLCPlayer._round(self._player.get_rate())
 
     def set_position(self, seconds):
-        seconds = max(seconds, 0)
-        self._player.set_time(1000 * seconds)
+        millis = VLCPlayer._round(1000. * max(seconds, 0.))
+        self._player.set_time(int(millis))
 
     def get_position(self):
-        return self._player.get_time() / 1000
+        return VLCPlayer._round(self._player.get_time() / 1000.)

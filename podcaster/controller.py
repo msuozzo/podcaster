@@ -44,17 +44,15 @@ class CmdLineController(object):
             use_initial_position = cmd == 'y'
         else:
             use_initial_position = False
-
-        self._player.play()
-        while not self._player.is_playing():
-            pass
         # initialize playback
+        self._player.play()
         if use_initial_position:
             self._player.set_position(initial_position)
         self._player.set_playback_rate(initial_rate)
         interrupted = False
         while True:
-            self._io.print_(self._status_menu())
+            if not interrupted:
+                self._io.print_(self._status_menu())
             cmd = self._io.async_input('> ' if not interrupted else '')
             self._update_callback(self._player)
             # If playback finishes, end the player regardless of the user command
@@ -63,7 +61,7 @@ class CmdLineController(object):
             interrupted = cmd is None
             if cmd in self.commands:
                 self.commands[cmd][1]()
-            elif not interrupted:
+            elif not interrupted and cmd:
                 self._io.print_('Invalid Command')
         self._player.stop()
 
