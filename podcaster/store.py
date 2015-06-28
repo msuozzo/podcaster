@@ -19,7 +19,11 @@ class SimplerFileStore(object):
     """A file store with no metadata
     """
     def __init__(self, store_dir):
-        self._store_dir = os.path.abspath(store_dir)
+        try:
+            self._store_dir = os.path.abspath(store_dir)
+        except OSError:
+            raise InitializationError('Failed to resolve requested store dir "%s"'
+                    ' (may be permission error with current directory)' % store_dir)
         self._load_dir()
 
     def _load_dir(self):
@@ -54,13 +58,15 @@ class SimplerFileStore(object):
 
         key - the string to be mapped to `data`
         data - the data to be associated with `key`
+            `data` may be a file open for reading.
+            In this case, the _contents_ of `data` will be associated with `key`
         """
         if isinstance(data, file):
             return self.put(key, data.read())
         if self.exists(key):
             self.remove(key)
         with open(self._key_to_path(key), 'wb') as data_file:
-            data_file.write(data)
+            data_file.write(bytes(data))
 
     def get_path(self, key):
         """If key is valid, return the file system path to the data file
@@ -138,11 +144,6 @@ class SimpleFileStore(SimplerFileStore):
             json.dump(self._manifest, manifest_file, cls=DatetimeEncoder, sort_keys=True, indent=4)
 
     def put(self, key, data):
-        """Store a key mapped to some data
-
-        key - the string to be mapped to `data`
-        data - the data to be associated with `key`
-        """
         super(SimpleFileStore, self).put(key, data)
         self._manifest[key] = {'added': datetime.now(tzutc()), 'path': self._key_to_path(key)}
 
