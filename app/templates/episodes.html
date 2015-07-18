@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ podcast.name }} Episodes{% endblock %}
+
+{% block content %}
+<h1>{{ podcast.name }} Episodes</h1>
+{%- if not podcast.episodes %}
+    <p>There don't seem to be any episodes here...</p>
+{%- else %}
+    {%- for episode in podcast.episodes | sort(attribute='date_published') | reverse %}
+        <p>
+        <a href="/play/{{ podcast.id }}/{{ episode.id }}">{{ episode.title }} ({{ podcast.name }})</a>
+        </p>
+    {%- endfor %}
+{%- endif %}
+<h1>Actions</h1>
+<p><a href="/">Back to All Podcasts</a></p>
+{% endblock %}

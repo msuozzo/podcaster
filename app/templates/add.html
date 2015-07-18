@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Add a Podcast{% endblock %}
+
+{% block content %}
+<h1>Add a Podcast</h1>
+
+{%- if error %}
+<p class="error"><strong>Error: </strong>{{ error }}</p>
+{%- endif %}
+{%- if success %}
+<p class="success"><strong>Added: </strong>{{ success }}</p>
+{%- endif %}
+<form method="get">
+    Feed URL: <input type="text" name="feed-url"><br>
+    <input type="submit" name="Submit">
+</form>
+<h1>Actions</h1>
+<p><a href={{ url_for('all_podcasts') }}>Back to All Podcasts</a></p>
+{% endblock %}

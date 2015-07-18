@@ -1,0 +1,18 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        {% block head %}
+        <title>{% block title %}{% endblock %} - Podcaster</title>
+        {% endblock %}
+    </head>
+    <body>
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+        <div class="footer">
+            {% block footer %}
+            &copy; Copyright 2015 by <a href="http://www.matthewsuozzo.com/">Matt Suozzo</a>.
+            {% endblock %}
+        </div>
+    </body>
+</html>
