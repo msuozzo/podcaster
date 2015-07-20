@@ -8,7 +8,6 @@ from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql.expression import desc
 
 
 class SessionError(Exception):
@@ -68,7 +67,7 @@ class Controller(object):
         podcast.check()
         episode_query = self._session.query(Episode)\
                             .filter_by(podcast_id=podcast_id)\
-                            .order_by(desc(Episode.date_published))
+                            .order_by(Episode.date_published.desc())
         episodes, page_range = Controller._paginate(episode_query, 10, base)
         return self.view.episodes(podcast, episodes, page_range)
 
@@ -77,7 +76,7 @@ class Controller(object):
         episode_query = self._session.query(Episode, Podcast)\
                                     .filter(Episode.podcast_id == Podcast.id)\
                                     .join(EpisodeFile)\
-                                    .order_by(desc(EpisodeFile.date_created))
+                                    .order_by(EpisodeFile.date_created.desc())
         episodes = [episode for episode, _ in episode_query.all()]
         podcasts = [podcast for _, podcast in episode_query.all()]
         return self.view.downloaded_episodes(episodes, podcasts)
