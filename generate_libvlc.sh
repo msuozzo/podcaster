@@ -1,13 +1,8 @@
 #!/bin/bash
 
-REPO_DIR=libvlc_python
-# Official repo but very slow
-#REPO_URL=http://git.videolan.org/git/vlc/bindings/python.git
-# Unofficial repo hosted on GitHub by one of the developers
-REPO_URL=https://github.com/oaubert/python-vlc.git
+# From the official repo but very slow
+FILE_URL="http://git.videolan.org/?p=vlc/bindings/python.git;a=blob_plain;f=generated/vlc.py;hb=refs/heads/master"
+# From an unofficial repo hosted on GitHub by one of the developers
+#FILE_URL="https://raw.githubusercontent.com/oaubert/python-vlc/master/generated/vlc.py"
 
-git clone $REPO_URL $REPO_DIR &&\
-    cd $REPO_DIR &&\
-    ./generate.py -o ../podcaster/vlc.py . &&\
-    cd .. &&\
-    rm -rf $REPO_DIR
+curl -# -o podcaster/vlc.py $FILE_URL 
