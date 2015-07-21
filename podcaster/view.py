@@ -25,8 +25,22 @@ class ASCIIView(object):
             else:
                 return choice
 
-    def update(self):
-        self._io.print_('Updating...')
+    def update(self, start=None, error=None, end=None):
+        """Alert user of status of update process.
+
+        Args:
+            start (bool): True if updating has begun
+            error: A 2-tuple of the form (podcast_in_error, str_reason)
+            end (bool): True if updating has finished
+        """
+        if start:
+            self._io.print_('Updating Podcast Data...')
+        elif error is not None:
+            podcast, reason = error
+            self._io.print_('Problem Updating "%s": %s' %
+                                    (podcast.name, reason))
+        elif end:
+            self._io.print_('Finished Updating Podcast Data')
 
     def add_podcast(self):
         while True:
@@ -35,8 +49,11 @@ class ASCIIView(object):
                 break
             self._io.print_('Retrieving feed information')
             new_podcast = self.controller.get_podcast_name(url)
-            if new_podcast is None:
-                self._io.print_('Failed to extract a Podcast RSS feed from URL')
+            if isinstance(new_podcast, tuple):
+                self._io.print_('Problem Loading URL: %s' % new_podcast[1])
+            elif new_podcast is None:
+                self._io.print_('Failed to extract a Podcast RSS feed at the \
+                    URL provided')
             elif self._io.input_('Add "%s" (y/N)? ' % new_podcast) == 'y':
                 self.controller.new_podcast(url)
                 self._io.print_('Successfully added "%s"' % new_podcast)
@@ -166,6 +183,15 @@ class ASCIIView(object):
         return self._menu_action(page_text, actions)
 
     def download(self, episode):
+        """Trigger and display the progress of downloading an episode
+
+        Args:
+            episode: The Episode object to download
+
+        Return:
+            On success: True
+            On failure: False
+        """
         self._io.print_('Downloading %s....' % episode.title)
         # Create a closure around mutable `current_progress`
         current_progress = [.0]
@@ -181,12 +207,12 @@ class ASCIIView(object):
                 self._io.write('%d%% ' % (100 * ratio))
                 self._io.flush()
                 current_progress[0] += progress_step
-        success = self.controller.download_episode(episode.id, cb_progress)
-        if not success:
-            self._io.print_('\nDownload failed')
+        error = self.controller.download_episode(episode.id, cb_progress)
+        if error:
+            self._io.print_('\nDownload failed: %s\n' % error)
         else:
             self._io.print_('\nDownload complete!\n')
-        return success
+        return not error
 
     def play(self, podcast, episode, cb_return_menu):
         """Launch the Player to play `episode`

@@ -11,3 +11,4 @@ htmlcov
 
 # Podcaster
 .podcasts
+podcaster/vlc.py
