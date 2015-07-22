@@ -20,7 +20,8 @@ class Podcast(db.Model):
     last_checked = db.Column(db.DateTime(timezone=True))
     last_updated = db.Column(db.DateTime(timezone=True))
     playback_rate = db.Column(db.Integer)
-    episodes = db.relationship('Episode', order_by='Episode.date_published', cascade='all, delete, delete-orphan')
+    episodes = db.relationship('Episode', order_by='Episode.date_published',
+                                            cascade='all, delete, delete-orphan')
 
     def __init__(self, **kwargs):
         if 'last_updated' not in kwargs or kwargs['last_updated'] is None:
@@ -56,7 +57,8 @@ class Episode(db.Model):
         return self.local_file is not None
 
     def __str__(self):
-        return 'Episode<podcast_id=%d, title=%s, published=%s>' % (self.podcast_id, self.title, self.date_published)
+        return 'Episode<podcast_id=%d, title=%s, published=%s>' % \
+                            (self.podcast_id, self.title, self.date_published)
 
 
 class EpisodeFile(db.Model):
