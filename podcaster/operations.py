@@ -246,9 +246,10 @@ class Controller(object):
                 of the operation.
         """
         episode = self._session.query(Episode).get(episode_id)
-        key = self._episode_key(episode_id)
-        self._store.remove(key)
-        self._session.delete(episode.local_file)
+        if episode.local_file is not None:
+            key = self._episode_key(episode_id)
+            self._store.remove(key)
+            self._session.delete(episode.local_file)
         return cb_return_menu
 
     def update_episode_state(self, episode_id, position, playback_rate):
