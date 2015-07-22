@@ -11,19 +11,18 @@ config = context.config
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
+# Fix pathing issue with virtualenv
 import sys
-sys.path.insert(0, '/Users/matthewsuozzo/Documents/projects/podcaster')
-from podcaster.model import BaseModel
-target_metadata = BaseModel.metadata
+sys.path.insert(0, '.')
+
+# Add model's MetaData object for 'autogenerate' support
+from app import app, db
+#from app import models
+target_metadata = db.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
-# ... etc.
 
 
 def run_migrations_offline():
@@ -38,7 +37,11 @@ def run_migrations_offline():
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    alembic_config = config.get_section(config.config_ini_section)
+    #alembic_config['sqlalchemy.url'] = 'sqlite:///.podcaster.db'
+    alembic_config['sqlalchemy.url'] = app.config['SQLALCHEMY_DATABASE_URI']
+
+    url = alembic_config['sqlalchemy.url']
     context.configure(
         url=url, target_metadata=target_metadata, literal_binds=True)
 
@@ -53,8 +56,12 @@ def run_migrations_online():
     and associate a connection with the context.
 
     """
+    alembic_config = config.get_section(config.config_ini_section)
+    #alembic_config['sqlalchemy.url'] = 'sqlite:///.podcaster.db'
+    alembic_config['sqlalchemy.url'] = app.config['SQLALCHEMY_DATABASE_URI']
+
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
+        alembic_config,
         prefix='sqlalchemy.',
         poolclass=pool.NullPool)
 
